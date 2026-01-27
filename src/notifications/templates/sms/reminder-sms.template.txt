@@ -1,0 +1,1 @@
+ImmuniTrack Reminder: {{childName}} has {{vaccineName}} due on {{dueDate}}. {{daysRemaining}} days remaining. Facility: {{facilityName}}. Reply YES to confirm, NO to reschedule.
