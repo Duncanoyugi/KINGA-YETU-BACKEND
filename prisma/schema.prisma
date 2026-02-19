@@ -6,7 +6,391 @@ datasource db {
   provider = "postgresql"
 }
 
-// ==================== ENUMS ====================
+model User {
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  phoneNumber        String?             @unique
+  password           String
+  fullName           String
+  role               UserRole            @default(PARENT)
+  isActive           Boolean             @default(true)
+  isEmailVerified    Boolean             @default(false)
+  isPhoneVerified    Boolean             @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  adminProfile       AdminProfile?
+  auditLogs          AuditLog[]
+  developmentRecords DevelopmentRecord[]
+  growthRecords      GrowthRecord[]
+  healthWorker       HealthWorker?
+  notifications      Notification[]
+  parentProfile      Parent?
+  reports            Report[]
+  sessions           Session[]
+  profile            UserProfile?
+
+  @@index([email])
+  @@index([role])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  email     String?
+  phone     String?
+  code      String
+  type      OtpType
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  metadata  String?  @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email, type, isUsed])
+  @@index([phone, type, isUsed])
+  @@index([expiresAt])
+  @@map("otps")
+}
+
+model UserProfile {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  dateOfBirth    DateTime?
+  gender         Gender?
+  profilePicture String?
+  address        String?
+  county         String?
+  subCounty      String?
+  ward           String?
+  idNumber       String?   @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([county, subCounty])
+  @@map("user_profiles")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Parent {
+  id               String     @id @default(cuid())
+  userId           String     @unique
+  emergencyContact String?
+  emergencyPhone   String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  children         Child[]
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders        Reminder[]
+
+  @@map("parents")
+}
+
+model HealthWorker {
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  licenseNumber  String?         @unique
+  qualification  String?
+  specialization String?
+  facilityId     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  facility       HealthFacility? @relation(fields: [facilityId], references: [id])
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  immunizations  Immunization[]
+
+  @@map("health_workers")
+}
+
+model AdminProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  department  String?
+  permissions String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admin_profiles")
+}
+
+model HealthFacility {
+  id            String             @id @default(cuid())
+  name          String
+  type          HealthFacilityType
+  code          String             @unique
+  mflCode       String?            @unique
+  county        String
+  subCounty     String
+  ward          String?
+  address       String?
+  phone         String?
+  email         String?
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  children      Child[]
+  healthWorkers HealthWorker[]
+  immunizations Immunization[]
+
+  @@index([county, subCounty])
+  @@index([mflCode])
+  @@map("health_facilities")
+}
+
+model Child {
+  id                 String                @id @default(cuid())
+  parentId           String
+  firstName          String
+  middleName         String?
+  lastName           String
+  dateOfBirth        DateTime
+  gender             Gender
+  birthCertificateNo String?               @unique
+  uniqueIdentifier   String                @default(cuid())
+  birthFacilityId    String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  birthFacility      HealthFacility?       @relation(fields: [birthFacilityId], references: [id])
+  parent             Parent                @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  developmentRecords DevelopmentRecord[]
+  growthRecords      GrowthRecord[]
+  immunizations      Immunization[]
+  reminders          Reminder[]
+  schedules          VaccinationSchedule[]
+
+  @@index([parentId])
+  @@index([dateOfBirth])
+  @@index([birthCertificateNo])
+  @@map("children")
+}
+
+model Vaccine {
+  id                 String                @id @default(cuid())
+  code               String                @unique
+  name               String
+  description        String?
+  administrationRoute String?
+  administrationSite  String?
+  dosage              String?
+  dosesRequired       String?
+  sideEffects         String?
+  manufacturer        String?
+  contraindications   String?
+  vaccineType        String?
+  storageRequirements String?
+  diseasePrevented   String?
+  recommendedAgeDays Int
+  minAgeDays         Int?
+  maxAgeDays         Int?
+  isBirthDose        Boolean               @default(false)
+  isBooster          Boolean               @default(false)
+  isActive           Boolean               @default(true)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  immunizations      Immunization[]
+  reminders          Reminder[]
+  schedules          VaccinationSchedule[]
+
+  @@index([code])
+  @@index([recommendedAgeDays])
+  @@map("vaccines")
+}
+
+model Immunization {
+  id               String             @id @default(cuid())
+  childId          String
+  vaccineId        String
+  facilityId       String
+  healthWorkerId   String
+  administeredBy   String?
+  dateAdministered DateTime           @default(now())
+  ageAtDays        Int
+  status           ImmunizationStatus @default(ADMINISTERED)
+  batchNumber      String?
+  expirationDate   DateTime?
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  child            Child              @relation(fields: [childId], references: [id], onDelete: Cascade)
+  facility         HealthFacility     @relation(fields: [facilityId], references: [id])
+  healthWorker     HealthWorker       @relation(fields: [healthWorkerId], references: [id])
+  vaccine          Vaccine            @relation(fields: [vaccineId], references: [id])
+
+  @@unique([childId, vaccineId])
+  @@index([childId])
+  @@index([vaccineId])
+  @@index([dateAdministered])
+  @@index([status])
+  @@map("immunizations")
+}
+
+model VaccinationSchedule {
+  id        String             @id @default(cuid())
+  childId   String
+  vaccineId String
+  dueDate   DateTime
+  status    ImmunizationStatus @default(SCHEDULED)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  child     Child              @relation(fields: [childId], references: [id], onDelete: Cascade)
+  vaccine   Vaccine            @relation(fields: [vaccineId], references: [id])
+
+  @@unique([childId, vaccineId])
+  @@index([childId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("vaccination_schedules")
+}
+
+model Reminder {
+  id           String         @id @default(cuid())
+  childId      String
+  parentId     String
+  vaccineId    String
+  type         ReminderType
+  message      String
+  scheduledFor DateTime
+  status       ReminderStatus @default(PENDING)
+  metadata     String?        @default("{}")
+  retryCount   Int            @default(0)
+  batchNumber  String?
+  errorMessage String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  child        Child          @relation(fields: [childId], references: [id], onDelete: Cascade)
+  parent       Parent         @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  vaccine      Vaccine        @relation(fields: [vaccineId], references: [id])
+
+  @@index([childId])
+  @@index([parentId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([retryCount])
+  @@map("reminders")
+}
+
+model GrowthRecord {
+  id              String   @id @default(cuid())
+  childId         String
+  measurementDate DateTime @default(now())
+  weight          Float
+  height          Float?
+  recordedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  recordedBy      User     @relation(fields: [recordedById], references: [id])
+
+  @@index([childId])
+  @@index([measurementDate])
+  @@map("growth_records")
+}
+
+model DevelopmentRecord {
+  id             String   @id @default(cuid())
+  childId        String
+  assessmentDate DateTime @default(now())
+  motorSkills    String?
+  languageSkills String?
+  socialSkills   String?
+  recordedById   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  child          Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  recordedBy     User     @relation(fields: [recordedById], references: [id])
+
+  @@index([childId])
+  @@index([assessmentDate])
+  @@map("development_records")
+}
+
+model Report {
+  id            String     @id @default(cuid())
+  title         String
+  type          ReportType
+  description   String?
+  parameters    String     @default("{}")
+  data          String     @default("{}")
+  format        ReportFormat @default(PDF)
+  frequency     ReportFrequency @default(ON_DEMAND)
+  isPublic      Boolean    @default(false)
+  scheduledFor  DateTime?
+  generatedById String
+  generatedAt   DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  generatedBy   User       @relation(fields: [generatedById], references: [id])
+
+  @@index([type])
+  @@index([generatedAt])
+  @@map("reports")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      String?          @default("{}")
+  isRead    Boolean          @default(false)
+  sentAt    DateTime         @default(now())
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  action     AuditAction
+  entityType String
+  entityId   String?
+  oldData    String?
+  newData    String?
+  createdAt  DateTime    @default(now())
+  user       User?       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  category  String
+  isPublic  Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([key])
+  @@index([category])
+  @@map("system_settings")
+}
 
 enum UserRole {
   PARENT
@@ -59,30 +443,29 @@ enum ReportType {
   CUSTOM
 }
 
+enum NotificationType {
+  VACCINE_REMINDER
+  APPOINTMENT_CONFIRMATION
+  REPORT_READY
+  PUSH_NOTIFICATION
+  SYSTEM_ALERT
+  SECURITY_ALERT
+}
+
 enum ReportFormat {
   PDF
-  EXCEL
   CSV
+  EXCEL
   JSON
   HTML
 }
 
 enum ReportFrequency {
+  ON_DEMAND
   DAILY
   WEEKLY
   MONTHLY
-  QUARTERLY
   YEARLY
-  ON_DEMAND
-}
-
-enum NotificationType {
-  VACCINE_REMINDER
-  APPOINTMENT_CONFIRMATION
-  REPORT_READY
-  SYSTEM_ALERT
-  SECURITY_ALERT
-  PUSH_NOTIFICATION
 }
 
 enum AuditAction {
@@ -102,477 +485,4 @@ enum HealthFacilityType {
   CLINIC
   MOBILE_CLINIC
   PRIVATE_PRACTICE
-}
-
-// ==================== CORE USER ====================
-
-model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  phoneNumber     String?  @unique
-  password        String
-  fullName        String
-  role            UserRole @default(PARENT)
-
-  isActive        Boolean  @default(true)
-  isEmailVerified Boolean  @default(false)
-  isPhoneVerified Boolean  @default(false)
-
-  lastLoginAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  profile         UserProfile?
-  parentProfile   Parent?
-  healthWorker    HealthWorker?
-  adminProfile    AdminProfile?
-
-  sessions        Session[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  reports         Report[]
-  growthRecords   GrowthRecord[]
-  developmentRecords DevelopmentRecord[]
-
-  @@map("users")
-  @@index([email])
-  @@index([role])
-  @@index([createdAt])
-}
-
-model Otp {
-  id        String   @id @default(cuid())
-  email     String?
-  phone     String?
-  code      String
-  type      OtpType
-  expiresAt DateTime
-  isUsed    Boolean  @default(false)
-  metadata  String?  @default("{}")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("otps")
-  @@index([email, type, isUsed])
-  @@index([phone, type, isUsed])
-  @@index([expiresAt])
-}
-
-// ==================== USER PROFILE ====================
-
-model UserProfile {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  dateOfBirth    DateTime?
-  gender         Gender?
-  profilePicture String?
-  address        String?
-  county         String?
-  subCounty      String?
-  ward           String?
-  idNumber       String?  @unique
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@map("user_profiles")
-  @@index([county, subCounty])
-}
-
-// ==================== AUTH SESSION ====================
-
-model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  token     String   @unique
-  expiresAt DateTime
-
-  createdAt DateTime @default(now())
-
-  @@map("sessions")
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-// ==================== ROLE TABLES ====================
-
-model Parent {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  emergencyContact String?
-  emergencyPhone   String?
-
-  children         Child[]
-  reminders        Reminder[]
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@map("parents")
-}
-
-model HealthWorker {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  licenseNumber  String?  @unique
-  qualification  String?
-  specialization String?
-
-  facilityId     String?
-  facility       HealthFacility? @relation(fields: [facilityId], references: [id])
-
-  immunizations  Immunization[]
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@map("health_workers")
-}
-
-model AdminProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  department  String?
-  permissions String   @default("[]")
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("admin_profiles")
-}
-
-// ==================== FACILITY ====================
-
-model HealthFacility {
-  id           String             @id @default(cuid())
-  name         String
-  type         HealthFacilityType
-  code         String             @unique
-  mflCode      String?            @unique
-
-  county       String
-  subCounty    String
-  ward         String?
-  address      String?
-  phone        String?
-  email        String?
-
-  isActive     Boolean            @default(true)
-
-  healthWorkers HealthWorker[]
-  immunizations Immunization[]
-  children      Child[]
-
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-
-  @@map("health_facilities")
-  @@index([county, subCounty])
-  @@index([mflCode])
-}
-
-// ==================== CHILD ====================
-
-model Child {
-  id                 String   @id @default(cuid())
-  parentId           String
-  parent             Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
-
-  firstName          String
-  middleName         String?
-  lastName           String
-  dateOfBirth        DateTime
-  gender             Gender
-
-  birthCertificateNo String?  @unique
-  uniqueIdentifier   String   @default(cuid())
-
-  birthFacilityId    String?
-  birthFacility      HealthFacility? @relation(fields: [birthFacilityId], references: [id])
-
-  immunizations      Immunization[]
-  schedules          VaccinationSchedule[]
-  reminders          Reminder[]
-  growthRecords      GrowthRecord[]
-  developmentRecords DevelopmentRecord[]
-
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  @@map("children")
-  @@index([parentId])
-  @@index([dateOfBirth])
-  @@index([birthCertificateNo])
-}
-
-// ==================== VACCINES ====================
-
-model Vaccine {
-  id                 String   @id @default(cuid())
-  code               String   @unique
-  name               String
-  description        String?
-
-  recommendedAgeDays Int
-  minAgeDays         Int?
-  maxAgeDays         Int?
-
-  isBirthDose        Boolean  @default(false)
-  isBooster          Boolean  @default(false)
-  administrationRoute String?
-  vaccineType        String?
-  diseasePrevented   String?
-  dosage             String?
-  administrationSite String?
-  dosesRequired      String?
-  manufacturer       String?
-  sideEffects        String?
-  contraindications  String?
-  storageRequirements String?
-
-  isActive           Boolean  @default(true)
-
-  immunizations      Immunization[]
-  schedules          VaccinationSchedule[]
-  reminders          Reminder[]
-
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  @@map("vaccines")
-  @@index([code])
-  @@index([recommendedAgeDays])
-}
-
-// ==================== IMMUNIZATION ====================
-
-model Immunization {
-  id               String   @id @default(cuid())
-  childId          String
-  child            Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-
-  vaccineId        String
-  vaccine          Vaccine  @relation(fields: [vaccineId], references: [id])
-
-  facilityId       String
-  facility         HealthFacility @relation(fields: [facilityId], references: [id])
-
-  healthWorkerId   String
-  healthWorker     HealthWorker   @relation(fields: [healthWorkerId], references: [id])
-
-  dateAdministered DateTime @default(now())
-  ageAtDays        Int
-  status           ImmunizationStatus @default(ADMINISTERED)
-
-  batchNumber      String?
-  notes            String?
-  expirationDate   DateTime?
-  administeredBy   String?
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@map("immunizations")
-  @@unique([childId, vaccineId])
-  @@index([childId])
-  @@index([vaccineId])
-  @@index([dateAdministered])
-  @@index([status])
-}
-
-// ==================== SCHEDULING ====================
-
-model VaccinationSchedule {
-  id             String   @id @default(cuid())
-  childId        String
-  child          Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-
-  vaccineId      String
-  vaccine        Vaccine  @relation(fields: [vaccineId], references: [id])
-
-  dueDate        DateTime
-  status         ImmunizationStatus @default(SCHEDULED)
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@map("vaccination_schedules")
-  @@unique([childId, vaccineId])
-  @@index([childId])
-  @@index([dueDate])
-  @@index([status])
-}
-
-// ==================== REMINDERS ====================
-
-model Reminder {
-  id           String   @id @default(cuid())
-  childId      String
-  child        Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-
-  parentId     String
-  parent       Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
-
-  vaccineId    String
-  vaccine      Vaccine  @relation(fields: [vaccineId], references: [id])
-
-  type         ReminderType
-  message      String
-  scheduledFor DateTime
-  status       ReminderStatus @default(PENDING)
-  metadata     String?  @default("{}")
-  retryCount   Int      @default(0)
-  batchNumber  String?
-  errorMessage String?
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@map("reminders")
-  @@index([childId])
-  @@index([parentId])
-  @@index([scheduledFor])
-  @@index([status])
-}
-
-// ==================== GROWTH & DEVELOPMENT ====================
-
-model GrowthRecord {
-  id              String   @id @default(cuid())
-  childId         String
-  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-
-  measurementDate DateTime @default(now())
-  weight          Float
-  height          Float?
-
-  recordedById    String
-  recordedBy      User     @relation(fields: [recordedById], references: [id])
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@map("growth_records")
-  @@index([childId])
-  @@index([measurementDate])
-}
-
-model DevelopmentRecord {
-  id              String   @id @default(cuid())
-  childId         String
-  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-
-  assessmentDate  DateTime @default(now())
-  motorSkills     String?
-  languageSkills  String?
-  socialSkills    String?
-
-  recordedById    String
-  recordedBy      User     @relation(fields: [recordedById], references: [id])
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@map("development_records")
-  @@index([childId])
-  @@index([assessmentDate])
-}
-
-// ==================== REPORTS ====================
-
-model Report {
-  id            String   @id @default(cuid())
-  title         String
-  type          ReportType
-  description   String?
-
-  parameters    String   @default("{}")
-  data          String   @default("{}")
-  isPublic      Boolean  @default(false)
-
-  generatedById String
-  generatedBy   User     @relation(fields: [generatedById], references: [id])
-
-  generatedAt   DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("reports")
-  @@index([type])
-  @@index([generatedAt])
-}
-
-// ==================== NOTIFICATIONS ====================
-
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  type      NotificationType
-  title     String
-  message   String
-  data      String?  @default("{}")
-
-  isRead    Boolean  @default(false)
-  sentAt    DateTime @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("notifications")
-  @@index([userId])
-  @@index([isRead])
-  @@index([type])
-}
-
-// ==================== AUDIT ====================
-
-model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-
-  action     AuditAction
-  entityType String
-  entityId   String?
-
-  oldData    String?
-  newData    String?
-
-  createdAt  DateTime @default(now())
-
-  @@map("audit_logs")
-  @@index([userId])
-  @@index([action])
-  @@index([entityType])
-  @@index([createdAt])
-}
-
-// ==================== SYSTEM SETTINGS ====================
-
-model SystemSetting {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     String
-  category  String
-  isPublic  Boolean  @default(false)
-
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-
-  @@map("system_settings")
-  @@index([key])
-  @@index([category])
 }

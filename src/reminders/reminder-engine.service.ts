@@ -43,9 +43,16 @@ export class ReminderEngineService {
           select: { id: true },
         });
         
-        whereCondition.childId = {
-          in: childrenInFacility.map(child => child.id),
-        };
+        // Guard against empty array to avoid IN (NULL) SQL error
+        if (childrenInFacility.length > 0) {
+          whereCondition.childId = {
+            in: childrenInFacility.map(child => child.id),
+          };
+        } else {
+          // If no children in facility, return empty result early
+          this.logger.log(`No children found for facility ${facilityId}`);
+          return { created: 0, skipped: 0 };
+        }
       }
 
       const schedules = await this.prisma.vaccinationSchedule.findMany({
@@ -408,9 +415,13 @@ export class ReminderEngineService {
         select: { id: true },
       });
       
-      where.childId = {
-        in: childrenInFacility.map(child => child.id),
-      };
+      // Guard against empty array to avoid IN (NULL) SQL error
+      if (childrenInFacility.length > 0) {
+        where.childId = {
+          in: childrenInFacility.map(child => child.id),
+        };
+      }
+      // If no children in facility, the query will return empty results
     }
 
     const [total, byStatus, byType] = await Promise.all([
