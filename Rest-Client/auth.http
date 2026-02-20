@@ -1,0 +1,101 @@
+### Base URL
+@baseUrl = http://localhost:3000/api/auth
+
+# =======================
+# 1. Register User
+# =======================
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "fullName": "John Doe",
+  "email": "john.doe@example.com",
+  "password": "Password@123",
+  "phoneNumber": "+254712345678",
+  "role": "PARENT",
+  "dateOfBirth": "1990-01-01",
+  "gender": "MALE",
+  "county": "Nairobi",
+  "subCounty": "Westlands",
+  "address": "123 Main Street",
+  "idNumber": "12345678",
+  "emergencyContact": "Jane Doe",
+  "emergencyPhone": "+254723456789"
+}
+
+### 
+# 2. Verify Email OTP
+# Replace OTP_CODE with the code you received in email
+POST {{baseUrl}}/verify-email
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "otpCode": "OTP_CODE"
+}
+
+###
+# 3. Login User
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "Password@123"
+}
+
+###
+# 4. Refresh Token
+# Replace REFRESH_TOKEN with the refresh token from login response
+POST {{baseUrl}}/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "REFRESH_TOKEN"
+}
+
+###
+# 5. Change Password
+# Replace ACCESS_TOKEN with the access token from login
+PATCH {{baseUrl}}/change-password
+Content-Type: application/json
+Authorization: Bearer ACCESS_TOKEN
+
+{
+  "currentPassword": "Password@123",
+  "newPassword": "NewPass@123",
+  "confirmNewPassword": "NewPass@123"
+}
+
+###
+# 6. Logout Current Device
+# Replace ACCESS_TOKEN with the access token from login
+POST {{baseUrl}}/logout
+Authorization: Bearer ACCESS_TOKEN
+
+###
+# 7. Logout All Devices
+# Replace ACCESS_TOKEN with the access token from login
+POST {{baseUrl}}/logout-all
+Authorization: Bearer ACCESS_TOKEN
+
+###
+# 8. Request Password Reset
+POST {{baseUrl}}/request-password-reset
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com"
+}
+
+###
+# 9. Reset Password with OTP
+# Replace OTP_CODE with OTP from password reset email
+POST {{baseUrl}}/reset-password
+Content-Type: application/json
+
+{
+  "otpCode": "OTP_CODE",
+  "newPassword": "NewPass@123",
+  "confirmNewPassword": "NewPass@123"
+}

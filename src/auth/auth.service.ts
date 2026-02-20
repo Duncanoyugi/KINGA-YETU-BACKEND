@@ -41,7 +41,11 @@ export class AuthService {
     private otpService: OtpService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<{ message: string; userId: string }> {
+  async register(registerDto: RegisterDto): Promise<{
+    user: any;
+    accessToken: string;
+    message: string;
+  }> {
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: registerDto.email },
@@ -78,6 +82,16 @@ export class AuthService {
         role: registerDto.role || UserRole.PARENT,
         isEmailVerified: false,
       },
+      include: {
+        profile: true,
+        parentProfile: true,
+        healthWorker: {
+          include: {
+            facility: true,
+          },
+        },
+        adminProfile: true,
+      },
     });
 
     // Send welcome email
@@ -100,9 +114,22 @@ export class AuthService {
       JSON.stringify(user), // newData
     );
 
+    // Generate JWT token
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = this.jwtService.sign(payload);
+
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = user;
+
     return {
+      user: userWithoutPassword,
+      accessToken,
       message: 'Registration successful. Please check your email for verification code.',
-      userId: user.id,
     };
   }
 
