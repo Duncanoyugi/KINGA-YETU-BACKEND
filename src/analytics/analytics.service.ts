@@ -18,7 +18,9 @@ import {
   PerformanceMetricsDto,
 } from './dto/analytics-response.dto';
 import { AnalyticsMetric, AnalyticsPeriod } from './dto/analytics-request.dto';
+import { CountyAdminDashboardDto, CoverageAlertDto } from './dto/county-admin-dashboard.dto';
 import moment from 'moment';
+import { ImmunizationStatus, ReminderStatus } from '@prisma/client';
 
 @Injectable()
 export class AnalyticsService {
@@ -446,6 +448,257 @@ export class AnalyticsService {
     return analytics;
   }
 
+  /**
+   * Get County Admin Dashboard data - aggregates all data for the dashboard
+   */
+  async getCountyAdminDashboard(county?: string): Promise<CountyAdminDashboardDto> {
+    try {
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      
+      // Get basic counts
+      const [
+        totalChildren,
+        totalFacilities,
+        totalHealthWorkers,
+        totalImmunizations,
+        thisMonthImmunizations,
+        lastMonthImmunizations,
+      ] = await Promise.all([
+        this.prisma.child.count(),
+        this.prisma.healthFacility.count(),
+        this.prisma.healthWorker.count(),
+        this.prisma.immunization.count(),
+        this.prisma.immunization.count({
+          where: {
+            dateAdministered: { gte: new Date(now.getFullYear(), now.getMonth(), 1) },
+          },
+        }),
+        this.prisma.immunization.count({
+          where: {
+            dateAdministered: { gte: lastMonth, lt: new Date(now.getFullYear(), now.getMonth(), 1) },
+          },
+        }),
+      ]);
+
+      // Calculate coverage (simplified)
+      const coverageRate = totalChildren > 0 ? Math.round((totalImmunizations / (totalChildren * 10)) * 100 * 10) / 10 : 0; // Assuming 10 vaccines per child
+      const previousCoverage = totalChildren > 0 ? Math.round((lastMonthImmunizations / (totalChildren * 10)) * 100 * 10) / 10 : 0;
+      const coverageTrend = coverageRate - previousCoverage;
+
+      // Get facilities grouped by sub-county (using county field)
+      const facilities = await this.prisma.healthFacility.findMany({
+        include: {
+          children: true,
+          healthWorkers: true,
+          immunizations: {
+            where: {
+              dateAdministered: { gte: new Date(now.getFullYear(), now.getMonth(), 1) },
+            },
+          },
+        },
+      });
+
+      // Aggregate by sub-county
+      const subCountyMap = new Map<string, any>();
+      facilities.forEach((facility) => {
+        const subCounty = facility.subCounty || 'Unknown';
+        if (!subCountyMap.has(subCounty)) {
+          subCountyMap.set(subCounty, {
+            name: subCounty,
+            facilities: 0,
+            children: 0,
+            healthWorkers: 0,
+            immunizations: 0,
+            coordinates: { lat: -1.2921 + (Math.random() - 0.5) * 0.1, lng: 36.8219 + (Math.random() - 0.5) * 0.1 },
+          });
+        }
+        const sc = subCountyMap.get(subCounty);
+        sc.facilities += 1;
+        sc.children += facility.children.length;
+        sc.healthWorkers += facility.healthWorkers.length;
+        sc.immunizations += facility.immunizations.length;
+      });
+
+      // Convert to sub-county stats
+      const subCountyStats = Array.from(subCountyMap.values()).map((sc: any) => {
+        const scCoverage = sc.children > 0 ? Math.round((sc.immunizations / (sc.children * 10)) * 100 * 10) / 10 : 0;
+        return {
+          name: sc.name,
+          coverage: scCoverage,
+          facilities: sc.facilities,
+          population: this.formatPopulation(sc.children * 10), // Estimate
+          target: 85,
+          healthWorkers: sc.healthWorkers,
+          children: this.formatNumber(sc.children),
+          status: scCoverage >= 85 ? 'exceeding' : scCoverage >= 70 ? 'on-track' : scCoverage >= 50 ? 'behind' : 'critical',
+          trend: `${scCoverage >= previousCoverage ? '+' : ''}${Math.round((scCoverage - previousCoverage) * 10) / 10}%`,
+          coordinates: sc.coordinates,
+        };
+      });
+
+      // Facility stats
+      const facilityStats = await Promise.all(
+        facilities.slice(0, 10).map(async (facility) => {
+          const immunizations = await this.prisma.immunization.count({
+            where: { facilityId: facility.id },
+          });
+          const children = await this.prisma.child.count({
+            where: { birthFacilityId: facility.id },
+          });
+          const healthWorkers = await this.prisma.healthWorker.count({
+            where: { facilityId: facility.id },
+          });
+          const facilityCoverage = children > 0 ? Math.round((immunizations / (children * 10)) * 100 * 10) / 10 : 0;
+
+          return {
+            name: facility.name,
+            coverage: facilityCoverage,
+            status: facilityCoverage >= 90 ? 'excellent' : facilityCoverage >= 70 ? 'good' : 'needs-improvement',
+            children: this.formatNumber(children),
+            healthWorkers,
+            vaccines: immunizations,
+            lastUpdated: 'Just now',
+            type: facility.type,
+            contact: facility.phone || 'N/A',
+          };
+        })
+      );
+
+      // Get recent activities from notifications/immunizations
+      const recentImmunizations = await this.prisma.immunization.findMany({
+        take: 10,
+        orderBy: { dateAdministered: 'desc' },
+        include: {
+          child: true,
+          facility: true,
+          healthWorker: {
+            include: { user: true },
+          },
+          vaccine: true,
+        },
+      });
+
+      const recentActivities = recentImmunizations.map((imm) => ({
+        action: `Vaccination: ${imm.vaccine.name}`,
+        facility: imm.facility.name,
+        time: this.getRelativeTime(imm.dateAdministered),
+        user: imm.healthWorker.user.fullName,
+        alert: false,
+      }));
+
+      // Get upcoming vaccination schedules
+      const upcomingSchedules = await this.prisma.vaccinationSchedule.findMany({
+        where: {
+          dueDate: {
+            gte: now,
+            lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // Next 7 days
+          },
+          status: 'SCHEDULED',
+        },
+        include: {
+          child: {
+            include: { parent: true },
+          },
+          vaccine: true,
+        },
+        take: 10,
+        orderBy: { dueDate: 'asc' },
+      });
+
+      const upcomingAppointments = upcomingSchedules.map((schedule) => ({
+        child: `${schedule.child.firstName} ${schedule.child.lastName}`,
+        vaccine: schedule.vaccine.name,
+        facility: 'Assigned Facility',
+        time: this.formatTime(schedule.dueDate),
+        status: schedule.dueDate < now ? 'overdue' : 'confirmed',
+        parent: schedule.child.parent ? 'Parent' : 'N/A',
+      }));
+
+      // Generate alerts based on data
+      const coverageAlerts: CoverageAlertDto[] = [];
+      const lowCoverageFacilities = facilityStats.filter(f => f.coverage < 70);
+      if (lowCoverageFacilities.length > 0) {
+        coverageAlerts.push({
+          type: 'low_coverage',
+          message: `${lowCoverageFacilities.length} facilities have coverage below 70%`,
+          facilities: lowCoverageFacilities.length,
+          severity: 'high',
+        });
+      }
+
+      // Build stats array
+      const stats = [
+        {
+          label: 'County Coverage',
+          value: `${coverageRate}%`,
+          trend: `${coverageTrend >= 0 ? '+' : ''}${Math.round(coverageTrend * 10) / 10}%`,
+          trendUp: coverageTrend >= 0,
+          color: 'primary',
+          bgColor: 'bg-primary-50',
+          textColor: 'text-primary-600',
+          description: `vs national target of 85%`,
+        },
+        {
+          label: 'Total Facilities',
+          value: totalFacilities.toString(),
+          trend: '+0',
+          trendUp: true,
+          color: 'info',
+          bgColor: 'bg-blue-50',
+          textColor: 'text-blue-600',
+          description: `across ${subCountyStats.length} sub-counties`,
+        },
+        {
+          label: 'Children Registered',
+          value: this.formatNumber(totalChildren),
+          trend: '+0',
+          trendUp: true,
+          color: 'success',
+          bgColor: 'bg-green-50',
+          textColor: 'text-green-600',
+          description: 'total registered',
+        },
+        {
+          label: 'Active Health Workers',
+          value: totalHealthWorkers.toString(),
+          trend: '+0',
+          trendUp: true,
+          color: 'purple',
+          bgColor: 'bg-purple-50',
+          textColor: 'text-purple-600',
+          description: 'across all facilities',
+        },
+      ];
+
+      // Resources (mock data - would need separate inventory tracking)
+      const resources = [
+        { label: 'Vaccine Fridges', value: Math.ceil(totalFacilities * 0.8), icon: '', status: 'operational', capacity: '85%', lastChecked: '1 hour ago' },
+        { label: 'Cold Chain Trucks', value: Math.ceil(totalFacilities * 0.2), icon: '', status: 'on-route', active: Math.ceil(totalFacilities * 0.15), lastChecked: '30 mins ago' },
+        { label: 'Mobile Clinics', value: Math.ceil(totalFacilities * 0.1), icon: '', status: 'deployed', active: Math.ceil(totalFacilities * 0.08), lastChecked: '2 hours ago' },
+      ];
+
+      return {
+        stats,
+        subCountyStats,
+        facilityStats,
+        resources,
+        recentActivities,
+        upcomingAppointments,
+        coverageAlerts,
+        totalCoverage: coverageRate,
+        totalFacilities,
+        totalChildren,
+        totalHealthWorkers,
+        previousMonthCoverage: previousCoverage,
+        coverageTrend,
+      };
+    } catch (error) {
+      this.logger.error(`Error getting county admin dashboard: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
   // Private helper methods
   private normalizeDates(
     startDate?: Date,
@@ -717,5 +970,48 @@ export class AnalyticsService {
   private convertToExcel(analytics: AnalyticsResponseDto[]): any {
     // This would use a library like exceljs in production
     return { message: 'Excel export would be implemented with exceljs library' };
+  }
+
+  // Helper methods for county admin dashboard
+  private formatNumber(num: number): string {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  }
+
+  private formatPopulation(num: number): string {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(0) + 'M';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(0) + 'K';
+    }
+    return num.toString();
+  }
+
+  private getRelativeTime(date: Date): string {
+    const now = new Date();
+    const diffMs = now.getTime() - new Date(date).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return new Date(date).toLocaleDateString();
+  }
+
+  private formatTime(date: Date): string {
+    return new Date(date).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
   }
 }

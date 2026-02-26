@@ -8,19 +8,20 @@ POST {{baseUrl}}/register
 Content-Type: application/json
 
 {
-  "fullName": "John Doe",
-  "email": "john.doe@example.com",
-  "password": "Password@123",
-  "phoneNumber": "+254712345678",
-  "role": "PARENT",
-  "dateOfBirth": "1990-01-01",
+  "fullName": "Duncan Ochieng",
+  "email": "admin.duncan2026@example.com",
+  "password": "Admin@12345",
+  "phoneNumber": "+254711000111",
+  "role": "ADMIN",
+  "dateOfBirth": "1995-06-15",
   "gender": "MALE",
   "county": "Nairobi",
   "subCounty": "Westlands",
-  "address": "123 Main Street",
-  "idNumber": "12345678",
-  "emergencyContact": "Jane Doe",
-  "emergencyPhone": "+254723456789"
+  "address": "Westlands Office Block A",
+  "idNumber": "34567890",
+  "emergencyContact": "Peter Ochieng",
+  "emergencyPhone": "+254722111222",
+  "acceptTerms": true
 }
 
 ### 
@@ -30,8 +31,8 @@ POST {{baseUrl}}/verify-email
 Content-Type: application/json
 
 {
-  "email": "john.doe@example.com",
-  "otpCode": "OTP_CODE"
+  "email": "jane@gmail.com",
+  "otpCode": "304461"
 }
 
 ###
@@ -40,8 +41,8 @@ POST {{baseUrl}}/login
 Content-Type: application/json
 
 {
-  "email": "john.doe@example.com",
-  "password": "Password@123"
+  "email": "Pheny.onyango2026@example.com",
+  "password": "NewPass@123"
 }
 
 ###
@@ -85,7 +86,7 @@ POST {{baseUrl}}/request-password-reset
 Content-Type: application/json
 
 {
-  "email": "john.doe@example.com"
+  "email": "Pheny.onyango2026@example.com"
 }
 
 ###
@@ -95,7 +96,7 @@ POST {{baseUrl}}/reset-password
 Content-Type: application/json
 
 {
-  "otpCode": "OTP_CODE",
+  "otpCode": "277128",
   "newPassword": "NewPass@123",
   "confirmNewPassword": "NewPass@123"
 }

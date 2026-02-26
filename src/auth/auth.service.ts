@@ -94,15 +94,29 @@ export class AuthService {
       },
     });
 
-    // Send welcome email
-    await this.mailerService.sendWelcomeEmail(user.email, user.fullName);
+    console.log(`✅ [AuthService] User created: ${user.email}`);
 
     // Generate and send OTP
-    await this.otpService.generateOtp({
-      email: user.email,
-      type: OtpType.EMAIL_VERIFICATION,
-      metadata: JSON.stringify({ userId: user.id }),
-    });
+    try {
+      // Generate OTP which now returns the code
+      const otpResult = await this.otpService.generateOtp({
+        email: user.email,
+        type: OtpType.EMAIL_VERIFICATION,
+        metadata: JSON.stringify({ userId: user.id }),
+      });
+      
+      // Access the code directly from the result
+      const otpCode = otpResult.code;
+      
+      console.log(`📧 [AuthService] Sending OTP email to ${user.email} with code: ${otpCode}`);
+      
+      // Send OTP email with the actual code
+      await this.mailerService.sendOtpEmail(user.email, otpCode, user.fullName);
+      
+      console.log(`✅ [AuthService] OTP email sent successfully to ${user.email}`);
+    } catch (error) {
+      console.error(`❌ [AuthService] Failed to send OTP email to ${user.email}:`, error.message);
+    }
 
     // Log audit
     await this.createAuditLog(
@@ -110,8 +124,8 @@ export class AuthService {
       AuditAction.CREATE,
       'User',
       user.id,
-      undefined, // oldData
-      JSON.stringify(user), // newData
+      undefined,
+      JSON.stringify(user),
     );
 
     // Generate JWT token
@@ -160,6 +174,11 @@ export class AuthService {
       throw new UnauthorizedException('Account is deactivated');
     }
 
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException('Please verify your email before logging in');
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
@@ -173,11 +192,11 @@ export class AuthService {
     });
 
     // Create session
-    const session = await this.prisma.session.create({
+    await this.prisma.session.create({
       data: {
         userId: user.id,
         token: this.generateRandomToken(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
 
@@ -218,7 +237,6 @@ export class AuthService {
   }
 
   async logout(userId: string, token?: string): Promise<void> {
-    // Delete current session if token provided
     if (token) {
       await this.prisma.session.deleteMany({
         where: {
@@ -228,7 +246,6 @@ export class AuthService {
       });
     }
 
-    // Log audit
     await this.createAuditLog(userId, AuditAction.LOGOUT, 'User', userId);
   }
 
@@ -250,6 +267,10 @@ export class AuthService {
 
       if (!user || !user.isActive) {
         throw new UnauthorizedException('User not found or inactive');
+      }
+
+      if (!user.isEmailVerified) {
+        throw new UnauthorizedException('Email not verified');
       }
 
       const newPayload: JwtPayload = {
@@ -275,6 +296,16 @@ export class AuthService {
       data: { isEmailVerified: true },
     });
 
+    console.log(`✅ [AuthService] Email verified for ${email}`);
+
+    // Send welcome email AFTER successful verification
+    try {
+      await this.mailerService.sendWelcomeEmail(user.email, user.fullName);
+      console.log(`📧 [AuthService] Welcome email sent to ${user.email}`);
+    } catch (error) {
+      console.warn(`[AuthService] Failed to send welcome email to ${user.email}: ${error.message}`);
+    }
+
     // Log audit
     await this.createAuditLog(
       user.id,
@@ -285,7 +316,7 @@ export class AuthService {
       'email_verification',
     );
 
-    return { message: 'Email verified successfully' };
+    return { message: 'Email verified successfully. Welcome to ImmuniTrack Kenya!' };
   }
 
   async requestPasswordReset(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
@@ -296,21 +327,26 @@ export class AuthService {
     });
 
     if (!user) {
-      // Don't reveal that user doesn't exist
       return { message: 'If an account exists with this email, you will receive reset instructions.' };
     }
 
-    // Generate OTP
-    const otp = await this.otpService.generateOtp({
-      email,
-      type: OtpType.PASSWORD_RESET,
-      metadata: JSON.stringify({ userId: user.id }),
-    });
+    try {
+      const otpResult = await this.otpService.generateOtp({
+        email,
+        type: OtpType.PASSWORD_RESET,
+        metadata: JSON.stringify({ userId: user.id }),
+      });
 
-    // Send reset email
-    await this.mailerService.sendOtpEmail(email, (otp as any).code, user.fullName);
+      const otpCode = otpResult.code;
+      
+      console.log(`📧 [AuthService] Sending password reset OTP to ${email} with code: ${otpCode}`);
+      
+      await this.mailerService.sendOtpEmail(email, otpCode, user.fullName);
+    } catch (error) {
+      console.warn(`[AuthService] Failed to send password reset email to ${email}: ${error.message}`);
+    }
 
-    return { message: 'Password reset instructions sent to your email.' };
+    return { message: 'If an account exists with this email, you will receive reset instructions.' };
   }
 
   async resetPassword(resetPasswordConfirmDto: ResetPasswordConfirmDto): Promise<{ message: string }> {
@@ -320,7 +356,6 @@ export class AuthService {
       throw new BadRequestException('Passwords do not match');
     }
 
-    // We need to find which email this OTP belongs to
     const otp = await this.prisma.otp.findFirst({
       where: {
         code: otpCode,
@@ -334,17 +369,14 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    // Verify OTP
     await this.otpService.verifyOtp(otp.email, otpCode, OtpType.PASSWORD_RESET);
 
-    // Update password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     const user = await this.prisma.user.update({
       where: { email: otp.email },
       data: { password: hashedPassword },
     });
 
-    // Log audit
     await this.createAuditLog(
       user.id,
       AuditAction.UPDATE,
@@ -372,22 +404,18 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
       throw new BadRequestException('Current password is incorrect');
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password
     await this.prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
 
-    // Log audit
     await this.createAuditLog(
       userId,
       AuditAction.UPDATE,
@@ -414,7 +442,13 @@ export class AuthService {
     }
 
     // Resend OTP
-    await this.otpService.resendOtp(email, OtpType.EMAIL_VERIFICATION);
+    const otpResult = await this.otpService.resendOtp(email, OtpType.EMAIL_VERIFICATION);
+    const otpCode = otpResult.code;
+    
+    console.log(`📧 [AuthService] Resending verification OTP to ${email} with code: ${otpCode}`);
+    
+    // Send OTP email
+    await this.mailerService.sendOtpEmail(email, otpCode, user.fullName);
 
     return { message: 'Verification email resent' };
   }

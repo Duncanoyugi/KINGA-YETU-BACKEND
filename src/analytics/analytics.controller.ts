@@ -226,4 +226,11 @@ export class AnalyticsController {
       analysis: 'Steady improvement observed over the period',
     };
   }
+
+  @Get('county-dashboard')
+  @ApiOperation({ summary: 'Get County Admin Dashboard data' })
+  @ApiQuery({ name: 'county', required: false, type: String })
+  async getCountyAdminDashboard(@Query('county') county?: string) {
+    return this.analyticsService.getCountyAdminDashboard(county);
+  }
 }

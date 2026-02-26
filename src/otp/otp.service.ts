@@ -6,11 +6,16 @@ import { OtpType } from '@prisma/client';
 import { generate } from 'otp-generator';
 import { OtpResponseDto } from './dto/otp-response.dto';
 
+// Extended interface to include code for email sending
+export interface OtpWithCode extends OtpResponseDto {
+  code: string;
+}
+
 @Injectable()
 export class OtpService {
   constructor(private prisma: PrismaService) {}
 
-  async generateOtp(data: CreateOtpDto): Promise<OtpResponseDto> {
+  async generateOtp(data: CreateOtpDto): Promise<OtpWithCode> {
     // Generate 6-digit numeric OTP
     const otpCode = generate(6, {
       digits: true,
@@ -18,6 +23,8 @@ export class OtpService {
       upperCaseAlphabets: false,
       specialChars: false,
     });
+
+    console.log(`🔑 [OtpService] Generated OTP code for ${data.email}: ${otpCode}`);
 
     // Set expiration to 10 minutes from now
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -37,8 +44,12 @@ export class OtpService {
     });
 
     if (existingOtp) {
-      // Resend existing OTP if still valid
-      return this.mapToOtpResponseDto(existingOtp);
+      console.log(`📋 [OtpService] Found existing OTP for ${data.email}: ${existingOtp.code}`);
+      // Return existing OTP with code for email sending
+      return {
+        ...this.mapToOtpResponseDto(existingOtp),
+        code: existingOtp.code,
+      };
     }
 
     // Create new OTP
@@ -53,7 +64,13 @@ export class OtpService {
       },
     });
 
-    return this.mapToOtpResponseDto(otp);
+    console.log(`✅ [OtpService] Created new OTP for ${data.email}: ${otp.code}`);
+
+    // Return with code for email sending
+    return {
+      ...this.mapToOtpResponseDto(otp),
+      code: otp.code,
+    };
   }
 
   async verifyOtp(email: string, code: string, type: OtpType): Promise<boolean> {
@@ -77,6 +94,7 @@ export class OtpService {
       data: { isUsed: true },
     });
 
+    console.log(`✅ [OtpService] OTP verified for ${email}`);
     return true;
   }
 
@@ -104,7 +122,9 @@ export class OtpService {
     return true;
   }
 
-  async resendOtp(email: string, type: OtpType): Promise<OtpResponseDto> {
+  async resendOtp(email: string, type: OtpType): Promise<OtpWithCode> {
+    console.log(`🔄 [OtpService] Resending OTP for ${email}`);
+
     // Delete existing unused OTPs
     await this.prisma.otp.deleteMany({
       where: {
@@ -157,5 +177,26 @@ export class OtpService {
       createdAt: otp.createdAt,
       metadata: otp.metadata || undefined,
     };
+  }
+
+  // Helper method to get OTP code for email sending
+  async getOtpCodeForEmail(email: string, type: OtpType): Promise<string> {
+    const otp = await this.prisma.otp.findFirst({
+      where: {
+        email,
+        type,
+        isUsed: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!otp) {
+      throw new BadRequestException('No valid OTP found');
+    }
+
+    return otp.code;
   }
 }
