@@ -65,30 +65,25 @@ export class ReportsController {
     });
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a specific report by ID' })
-  @ApiParam({ name: 'id', type: String })
-  @ApiResponse({ status: 200, description: 'Report found' })
-  @ApiResponse({ status: 404, description: 'Report not found' })
-  async findOne(@Param('id') id: string) {
-    return this.reportsService.findOne(id);
+  // Specific routes must be defined BEFORE parameterized routes
+  // to avoid :id catching keywords like 'coverage'
+
+  @Get('coverage')
+  @ApiOperation({ summary: 'Get immunization coverage report data' })
+  @ApiResponse({ status: 200, description: 'Coverage report data retrieved' })
+  async getCoverageReport(
+    @Query() query: CoverageReportRequestDto,
+    @Query('userId') userId?: string,
+  ) {
+    return this.reportsService.generateCoverageReport(query, userId || '');
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a report' })
+  @Get('coverage/download')
+  @ApiOperation({ summary: 'Download coverage report' })
   @ApiParam({ name: 'id', type: String })
-  @ApiResponse({ status: 200, description: 'Report updated successfully' })
-  async update(@Param('id') id: string, @Body() updateReportDto: UpdateReportDto) {
-    return this.reportsService.update(id, updateReportDto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a report' })
-  @ApiParam({ name: 'id', type: String })
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiResponse({ status: 204, description: 'Report deleted successfully' })
-  async remove(@Param('id') id: string) {
-    return this.reportsService.remove(id);
+  @ApiResponse({ status: 200, description: 'Coverage report downloaded' })
+  async downloadCoverageReport(@Query('id') id: string) {
+    return this.reportsService.getReportDownloadUrl(id);
   }
 
   @Post('coverage')
@@ -147,6 +142,32 @@ export class ReportsController {
   @ApiResponse({ status: 200, description: 'Download URL generated' })
   async getDownloadUrl(@Param('id') id: string) {
     return this.reportsService.getReportDownloadUrl(id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a specific report by ID' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Report found' })
+  @ApiResponse({ status: 404, description: 'Report not found' })
+  async findOne(@Param('id') id: string) {
+    return this.reportsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a report' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Report updated successfully' })
+  async update(@Param('id') id: string, @Body() updateReportDto: UpdateReportDto) {
+    return this.reportsService.update(id, updateReportDto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a report' })
+  @ApiParam({ name: 'id', type: String })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiResponse({ status: 204, description: 'Report deleted successfully' })
+  async remove(@Param('id') id: string) {
+    return this.reportsService.remove(id);
   }
 
   @Get('download/:id')

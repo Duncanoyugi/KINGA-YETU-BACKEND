@@ -39,9 +39,37 @@ export class PushProvider {
         return;
       }
 
+      // Parse the service account - handle both string and object formats
+      let parsedServiceAccount: any;
+      
+      if (typeof serviceAccount === 'string') {
+        try {
+          parsedServiceAccount = JSON.parse(serviceAccount);
+        } catch (parseError) {
+          // If it's not JSON, check if it's a file path or handle as raw string
+          this.logger.warn('Firebase service account is not valid JSON. Push notifications disabled.');
+          this.logger.debug(`Service account content (first 100 chars): ${serviceAccount.substring(0, 100)}`);
+          return;
+        }
+      } else if (typeof serviceAccount === 'object') {
+        parsedServiceAccount = serviceAccount;
+      } else {
+        this.logger.warn('Firebase service account format is invalid. Push notifications disabled.');
+        return;
+      }
+
+      // Validate required fields for Firebase service account
+      const requiredFields = ['project_id', 'private_key', 'client_email'];
+      const missingFields = requiredFields.filter(field => !parsedServiceAccount[field]);
+      
+      if (missingFields.length > 0) {
+        this.logger.warn(`Firebase service account missing required fields: ${missingFields.join(', ')}. Push notifications disabled.`);
+        return;
+      }
+
       if (!admin.apps.length) {
         admin.initializeApp({
-          credential: admin.credential.cert(JSON.parse(serviceAccount)),
+          credential: admin.credential.cert(parsedServiceAccount),
         });
       }
 

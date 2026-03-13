@@ -11,6 +11,8 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -28,13 +30,19 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('children')
 @Controller('children')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 export class ChildrenController {
-  constructor(private readonly childrenService: ChildrenService) {}
+  private readonly logger = new Logger(ChildrenController.name);
+  
+  constructor(
+    private readonly childrenService: ChildrenService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post()
   @Roles(UserRole.PARENT, UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -182,15 +190,46 @@ export class ChildrenController {
   }
 
   private async getParentIdFromUser(userId: string): Promise<string> {
-    const parent = await this.childrenService['prisma'].parent.findUnique({
+    // First check if user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Check if parent profile exists
+    const parent = await this.prisma.parent.findUnique({
       where: { userId },
       select: { id: true },
     });
     
-    if (!parent) {
-      throw new Error('Parent profile not found for user');
+    if (parent) {
+      return parent.id;
     }
     
-    return parent.id;
+    // Auto-create parent profile if it doesn't exist (for existing users who registered before the fix)
+    try {
+      const newParent = await this.prisma.parent.create({
+        data: {
+          userId,
+        },
+      });
+      this.logger.log(`Auto-created parent profile for user: ${userId}`);
+      return newParent.id;
+    } catch (error) {
+      // If creation fails (e.g., due to race condition), try to fetch again
+      this.logger.warn(`Failed to auto-create parent profile for user ${userId}: ${error.message}`);
+      const existingParent = await this.prisma.parent.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (existingParent) {
+        return existingParent.id;
+      }
+      throw new NotFoundException('Parent profile not found for user');
+    }
   }
 }

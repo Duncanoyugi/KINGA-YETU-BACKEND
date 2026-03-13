@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as AfricasTalking from 'africastalking';
+import AfricasTalking from 'africastalking';
 
 export interface SmsOptions {
   to: string | string[];

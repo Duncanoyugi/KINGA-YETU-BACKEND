@@ -5,6 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { MailerModule } from '../mailer/mailer.module';
 import { NotificationsService } from './notifications.service';
 import { NotificationQueueService } from './notification-queue.service';
+import { NotificationsController } from './notifications.controller';
 import { SmsProvider } from './providers/sms.provider';
 import { EmailProvider } from './providers/email.provider';
 import { PushProvider } from './providers/push.provider';
@@ -16,6 +17,7 @@ import { PushProvider } from './providers/push.provider';
     PrismaModule,
     MailerModule,
   ],
+  controllers: [NotificationsController],
   providers: [
     NotificationsService,
     NotificationQueueService,

@@ -104,6 +104,61 @@ export class ParentsController {
     return this.parentsService.searchParents(term);
   }
 
+  @Get('user/:userId')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.HEALTH_WORKER)
+  @ApiOperation({ summary: 'Get parent by user ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Parent details',
+    type: ParentResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Parent not found' })
+  async findByUserId(@Param('userId') userId: string): Promise<ParentResponseDto> {
+    return this.parentsService.findByUserId(userId);
+  }
+
+  // IMPORTANT: These routes MUST come before :id to avoid :id matching 'dashboard' or 'stats'
+  @Get(':id/dashboard')
+  @Roles(UserRole.PARENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get parent dashboard' })
+  @ApiParam({ name: 'id', description: 'Parent ID' })
+  @ApiResponse({ status: 200, description: 'Parent dashboard data' })
+  async getDashboard(@Param('id') id: string) {
+    return this.parentsService.getParentDashboard(id);
+  }
+
+  @Get(':id/stats')
+  @Roles(UserRole.PARENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get parent statistics by ID' })
+  @ApiParam({ name: 'id', description: 'Parent ID' })
+  @ApiResponse({ status: 200, description: 'Parent statistics' })
+  async getStatsById(@Param('id') id: string) {
+    return this.parentsService.getParentStatsById(id);
+  }
+
+  @Get(':id/children')
+  @Roles(UserRole.PARENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get parent children' })
+  @ApiParam({ name: 'id', description: 'Parent ID' })
+  @ApiResponse({ status: 200, description: 'Parent children' })
+  async getChildren(@Param('id') id: string) {
+    return this.parentsService.getParentChildren(id);
+  }
+
+  @Get(':id/reminders')
+  @Roles(UserRole.PARENT)
+  @ApiOperation({ summary: 'Get parent reminders' })
+  @ApiParam({ name: 'id', description: 'Parent ID' })
+  @ApiQuery({ name: 'upcomingOnly', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Parent reminders' })
+  async getReminders(
+    @Param('id') id: string,
+    @Query('upcomingOnly') upcomingOnly?: boolean,
+  ) {
+    return this.parentsService.getParentReminders(id, upcomingOnly === true);
+  }
+
+  // Generic :id route should come LAST
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.HEALTH_WORKER)
   @ApiOperation({ summary: 'Get a parent by ID' })
@@ -116,19 +171,6 @@ export class ParentsController {
   @ApiParam({ name: 'id', description: 'Parent ID' })
   async findOne(@Param('id') id: string): Promise<ParentResponseDto> {
     return this.parentsService.findOne(id);
-  }
-
-  @Get('user/:userId')
-  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.HEALTH_WORKER)
-  @ApiOperation({ summary: 'Get parent by user ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Parent details',
-    type: ParentResponseDto,
-  })
-  @ApiResponse({ status: 404, description: 'Parent not found' })
-  async findByUserId(@Param('userId') userId: string): Promise<ParentResponseDto> {
-    return this.parentsService.findByUserId(userId);
   }
 
   @Patch('profile')

@@ -1,0 +1,16 @@
+{
+  "id": "coverage",
+  "title": "Coverage Report",
+  "type": "COVERAGE",
+  "description": "Vaccination coverage statistics",
+  "parameters": {},
+  "data": {},
+  "format": "PDF",
+  "frequency": "MONTHLY",
+  "isPublic": true,
+  "scheduledFor": null,
+  "generatedById": null,
+  "generatedAt": null,
+  "createdAt": "2026-03-11T00:00:00.000Z",
+  "updatedAt": "2026-03-11T00:00:00.000Z"
+}

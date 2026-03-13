@@ -230,7 +230,7 @@ export class ParentsService {
   }
 
   async findByUserId(userId: string): Promise<ParentResponseDto> {
-    const parent = await this.prisma.parent.findUnique({
+    let parent = await this.prisma.parent.findUnique({
       where: { userId },
       include: {
         user: {
@@ -251,6 +251,39 @@ export class ParentsService {
       },
     });
 
+    // Auto-create parent profile if it doesn't exist (for existing users who registered before the fix)
+    if (!parent) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      
+      if (user) {
+        parent = await this.prisma.parent.create({
+          data: {
+            userId,
+          },
+          include: {
+            user: {
+              include: {
+                profile: true,
+              },
+            },
+            children: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                dateOfBirth: true,
+                gender: true,
+              },
+              orderBy: { dateOfBirth: 'desc' },
+            },
+          },
+        });
+        console.log(`[ParentsService] Auto-created parent profile for user: ${userId}`);
+      }
+    }
+
     if (!parent) {
       throw new NotFoundException('Parent profile not found');
     }
@@ -260,9 +293,25 @@ export class ParentsService {
 
   async updateParentProfile(userId: string, profileData: ParentProfileDto): Promise<ParentResponseDto> {
     // Check if parent exists
-    const parent = await this.prisma.parent.findUnique({
+    let parent = await this.prisma.parent.findUnique({
       where: { userId },
     });
+
+    // Auto-create parent profile if it doesn't exist (for existing users who registered before the fix)
+    if (!parent) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      
+      if (user) {
+        parent = await this.prisma.parent.create({
+          data: {
+            userId,
+          },
+        });
+        console.log(`[ParentsService] Auto-created parent profile for user: ${userId}`);
+      }
+    }
 
     if (!parent) {
       throw new NotFoundException('Parent profile not found');
@@ -450,6 +499,245 @@ export class ParentsService {
         createdAt: parent.createdAt,
       })),
     };
+  }
+
+  /**
+   * Get parent dashboard data
+   */
+  async getParentDashboard(parentId: string) {
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+      include: {
+        user: true,
+        children: {
+          include: {
+            immunizations: true,
+            schedules: {
+              where: {
+                dueDate: { gte: new Date() },
+              },
+              orderBy: { dueDate: 'asc' },
+              take: 5,
+            },
+          },
+        },
+      },
+    });
+
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID ${parentId} not found`);
+    }
+
+    // Get upcoming reminders
+    const upcomingReminders = await this.prisma.reminder.findMany({
+      where: {
+        parentId,
+        scheduledFor: { gte: new Date() },
+        status: 'PENDING',
+      },
+      orderBy: { scheduledFor: 'asc' },
+      take: 5,
+      include: {
+        child: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        vaccine: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Calculate stats
+    const totalChildren = parent.children.length;
+    let completedVaccinations = 0;
+    let upcomingVaccinations = 0;
+    let missedVaccinations = 0;
+
+    for (const child of parent.children) {
+      completedVaccinations += child.immunizations.filter(i => i.status === 'ADMINISTERED').length;
+      upcomingVaccinations += child.schedules.filter(s => s.status === 'SCHEDULED').length;
+      missedVaccinations += child.schedules.filter(s => 
+        s.status === 'MISSED' || 
+        (s.status === 'SCHEDULED' && new Date(s.dueDate) < new Date())
+      ).length;
+    }
+
+    const totalVaccinations = completedVaccinations + upcomingVaccinations + missedVaccinations;
+    const completionRate = totalVaccinations > 0 
+      ? Math.round((completedVaccinations / totalVaccinations) * 100) 
+      : 0;
+
+    return {
+      parent: {
+        id: parent.id,
+        fullName: parent.user.fullName,
+        email: parent.user.email,
+      },
+      children: parent.children.map(child => ({
+        id: child.id,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        dateOfBirth: child.dateOfBirth,
+        gender: child.gender,
+        completedVaccinations: child.immunizations.filter(i => i.status === 'ADMINISTERED').length,
+        upcomingVaccinations: child.schedules.filter(s => s.status === 'SCHEDULED').length,
+      })),
+      upcomingReminders: upcomingReminders.map(reminder => ({
+        id: reminder.id,
+        childName: `${reminder.child.firstName} ${reminder.child.lastName}`,
+        vaccineName: reminder.vaccine?.name,
+        scheduledFor: reminder.scheduledFor,
+        status: reminder.status,
+      })),
+      stats: {
+        totalChildren,
+        completedVaccinations,
+        upcomingVaccinations,
+        missedVaccinations,
+        completionRate,
+      },
+    };
+  }
+
+  /**
+   * Get parent statistics
+   */
+  async getParentStatsById(parentId: string) {
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+      include: {
+        children: {
+          include: {
+            immunizations: true,
+            schedules: true,
+          },
+        },
+      },
+    });
+
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID ${parentId} not found`);
+    }
+
+    const totalChildren = parent.children.length;
+    let completedVaccinations = 0;
+    let upcomingVaccinations = 0;
+    let missedVaccinations = 0;
+
+    for (const child of parent.children) {
+      completedVaccinations += child.immunizations.filter(i => i.status === 'ADMINISTERED').length;
+      upcomingVaccinations += child.schedules.filter(s => s.status === 'SCHEDULED').length;
+      missedVaccinations += child.schedules.filter(s => 
+        s.status === 'MISSED' || 
+        (s.status === 'SCHEDULED' && new Date(s.dueDate) < new Date())
+      ).length;
+    }
+
+    const totalVaccinations = completedVaccinations + upcomingVaccinations + missedVaccinations;
+    const completionRate = totalVaccinations > 0 
+      ? Math.round((completedVaccinations / totalVaccinations) * 100) 
+      : 0;
+
+    return {
+      totalChildren,
+      completedVaccinations,
+      upcomingVaccinations,
+      missedVaccinations,
+      completionRate,
+    };
+  }
+
+  /**
+   * Get children of a parent
+   */
+  async getParentChildren(parentId: string) {
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+      include: {
+        children: {
+          include: {
+            immunizations: {
+              orderBy: { dateAdministered: 'desc' },
+              take: 10,
+              include: {
+                vaccine: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            schedules: {
+              orderBy: { dueDate: 'asc' },
+              include: {
+                vaccine: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID ${parentId} not found`);
+    }
+
+    return parent.children;
+  }
+
+  /**
+   * Get reminders for a parent
+   */
+  async getParentReminders(parentId: string, upcomingOnly: boolean = false) {
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parent) {
+      throw new NotFoundException(`Parent with ID ${parentId} not found`);
+    }
+
+    const where: any = {
+      parentId,
+    };
+
+    if (upcomingOnly) {
+      where.scheduledFor = { gte: new Date() };
+      where.status = 'PENDING';
+    }
+
+    const reminders = await this.prisma.reminder.findMany({
+      where,
+      orderBy: { scheduledFor: 'asc' },
+      include: {
+        child: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        vaccine: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return reminders;
   }
 
   async searchParents(searchTerm: string) {

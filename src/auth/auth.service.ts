@@ -94,6 +94,16 @@ export class AuthService {
       },
     });
 
+    // If user is registering as PARENT, automatically create parent profile
+    if (user.role === UserRole.PARENT) {
+      await this.prisma.parent.create({
+        data: {
+          userId: user.id,
+        },
+      });
+      console.log(`✅ [AuthService] Parent profile created for user: ${user.email}`);
+    }
+
     console.log(`✅ [AuthService] User created: ${user.email}`);
 
     // Generate and send OTP
@@ -206,6 +216,11 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
+
+    // Debug: Log JWT configuration
+    const jwtSecret = this.configService.get('JWT_ACCESS_SECRET');
+    console.log('[AuthService] JWT_ACCESS_SECRET for signing:', jwtSecret ? '✓ (secret present)' : '✗ (secret MISSING)');
+    console.log('[AuthService] Signing token with payload:', payload);
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {

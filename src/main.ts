@@ -1,9 +1,21 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  // Debug: Log loaded environment variables
+  const configService = app.get(ConfigService);
+  console.log('='.repeat(50));
+  console.log('[Bootstrap] Environment Configuration:');
+  console.log('  PORT:', configService.get('PORT') || '5000 (default)');
+  console.log('  DATABASE_URL:', configService.get('DATABASE_URL') ? '✓ configured' : '✗ NOT SET');
+  console.log('  JWT_ACCESS_SECRET:', configService.get('JWT_ACCESS_SECRET') ? '✓ configured' : '✗ NOT SET');
+  console.log('  JWT_REFRESH_SECRET:', configService.get('JWT_REFRESH_SECRET') ? '✓ configured' : '✗ NOT SET');
+  console.log('  JWT_ACCESS_EXPIRY:', configService.get('JWT_ACCESS_EXPIRY') || '15m (default)');
+  console.log('='.repeat(50));
   
   // Enable CORS for frontend
   app.enableCors({
