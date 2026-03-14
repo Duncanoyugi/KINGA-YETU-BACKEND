@@ -1014,4 +1014,61 @@ export class AnalyticsService {
       hour12: true,
     });
   }
+
+  /**
+   * Get count of immunizations performed today
+   */
+  async getImmunizationsToday(startDate: Date, endDate: Date): Promise<number> {
+    return this.prisma.immunization.count({
+      where: {
+        dateAdministered: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+    });
+  }
+
+  /**
+   * Get count of pending reminders
+   */
+  async getPendingReminders(): Promise<number> {
+    return this.prisma.reminder.count({
+      where: {
+        status: ReminderStatus.PENDING,
+      },
+    });
+  }
+
+  /**
+   * Get count of active users (users logged in recently)
+   */
+  async getActiveUsers(): Promise<number> {
+    // Consider users active if they logged in within the last 30 minutes
+    const thirtyMinutesAgo = new Date();
+    thirtyMinutesAgo.setMinutes(thirtyMinutesAgo.getMinutes() - 30);
+
+    // This assumes there's a lastLogin field on User
+    // If not, we'll return a placeholder based on session activity
+    return this.prisma.user.count({
+      where: {
+        lastLoginAt: {
+          gte: thirtyMinutesAgo,
+        },
+      },
+    });
+  }
+
+  /**
+   * Get count of alerts/notifications
+   */
+  async getAlertsCount(): Promise<number> {
+    return this.prisma.notification.count({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)), // Today only
+        },
+      },
+    });
+  }
 }

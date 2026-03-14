@@ -16,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { MailerModule } from './mailer/mailer.module';
 import { OtpModule } from './otp/otp.module';
+import { FacilitiesModule } from './facilities/facilities.module';
 
 @Module({
   imports: [
@@ -36,7 +37,8 @@ import { OtpModule } from './otp/otp.module';
     NotificationsModule,
     AnalyticsModule,
     MailerModule,
-    OtpModule
+    OtpModule,
+    FacilitiesModule
   ],
   controllers: [AppController],
   providers: [AppService],

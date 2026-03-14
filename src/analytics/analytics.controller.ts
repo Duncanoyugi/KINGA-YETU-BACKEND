@@ -233,4 +233,43 @@ export class AnalyticsController {
   async getCountyAdminDashboard(@Query('county') county?: string) {
     return this.analyticsService.getCountyAdminDashboard(county);
   }
+
+  @Get('realtime')
+  @ApiOperation({ summary: 'Get real-time statistics' })
+  @ApiResponse({
+    status: 200,
+    schema: {
+      example: {
+        activeUsers: 15,
+        todayVaccinations: 42,
+        pendingAppointments: 23,
+        alerts: 5,
+      },
+    },
+  })
+  async getRealTimeStats() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get today's immunizations count
+    const todayImmunizations = await this.analyticsService.getImmunizationsToday(today, tomorrow);
+
+    // Get pending reminders count
+    const pendingReminders = await this.analyticsService.getPendingReminders();
+
+    // Get active users count
+    const activeUsers = await this.analyticsService.getActiveUsers();
+
+    // Get alerts count
+    const alerts = await this.analyticsService.getAlertsCount();
+
+    return {
+      activeUsers,
+      todayVaccinations: todayImmunizations,
+      pendingAppointments: pendingReminders,
+      alerts,
+    };
+  }
 }

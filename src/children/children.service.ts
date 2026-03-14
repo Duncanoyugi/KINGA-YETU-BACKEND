@@ -88,11 +88,11 @@ export class ChildrenService {
   async create(createChildDto: CreateChildDto, userId?: string): Promise<ChildResponseDto> {
     // Check if parent exists
     const parent = await this.prisma.parent.findUnique({
-      where: { userId: createChildDto.parentId },
+      where: { id: createChildDto.parentId },
     });
 
     if (!parent) {
-      throw new NotFoundException(`Parent with ID ${createChildDto.parentId} not found`);
+      throw new NotFoundException(`Parent profile with ID ${createChildDto.parentId} not found`);
     }
 
     // Check if user is authorized (either parent or admin)
@@ -116,14 +116,23 @@ export class ChildrenService {
       }
     }
 
-    // Check if birth facility exists
-    if (createChildDto.birthFacilityId) {
-      const facility = await this.prisma.healthFacility.findUnique({
-        where: { id: createChildDto.birthFacilityId },
+// Resolve birth facility by name if provided
+    if (createChildDto.birthFacilityName) {
+      const facility = await this.prisma.healthFacility.findFirst({
+        where: {
+          name: {
+            contains: createChildDto.birthFacilityName.trim(),
+            mode: 'insensitive'
+          },
+          isActive: true
+        }
       });
       if (!facility) {
-        throw new NotFoundException(`Health facility with ID ${createChildDto.birthFacilityId} not found`);
+        throw new NotFoundException(`No active facility found matching "${createChildDto.birthFacilityName}"`);
       }
+      // Set ID for repository, remove name
+      (createChildDto as any).birthFacilityId = facility.id;
+      delete (createChildDto as any).birthFacilityName;
     }
 
     // Validate date of birth (not in future)
@@ -205,7 +214,25 @@ export class ChildrenService {
       }
     }
 
-    // Check if birth certificate number is being changed and if it already exists
+// Resolve birth facility by name if provided (update)
+    if (updateChildDto.birthFacilityName !== undefined) {
+      const facility = await this.prisma.healthFacility.findFirst({
+        where: {
+          name: {
+            contains: updateChildDto.birthFacilityName!.trim(),
+            mode: 'insensitive'
+          },
+          isActive: true
+        }
+      });
+      if (updateChildDto.birthFacilityName && !facility) {
+        throw new NotFoundException(`No active facility found matching "${updateChildDto.birthFacilityName}"`);
+      }
+      (updateChildDto as any).birthFacilityId = facility?.id || null;
+      delete (updateChildDto as any).birthFacilityName;
+    }
+
+// Check if birth certificate number is being changed and if it already exists
     if (updateChildDto.birthCertificateNo && 
         updateChildDto.birthCertificateNo !== existingChild.birthCertificateNo) {
       const existingWithBC = await this.childrenRepository.findByBirthCertificate(

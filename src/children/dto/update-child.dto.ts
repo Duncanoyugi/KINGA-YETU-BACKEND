@@ -1,6 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateChildDto } from './create-child.dto';
-import { IsOptional, IsString, IsDateString, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsEnum, IsUUID } from 'class-validator';
 import { Gender } from '@prisma/client';
 
 export class UpdateChildDto extends PartialType(CreateChildDto) {
@@ -57,5 +57,23 @@ export class UpdateChildDto extends PartialType(CreateChildDto) {
   })
   @IsOptional()
   @IsString()
-  birthCertificateNo?: string;
+birthCertificateNo?: string;
+
+  @ApiProperty({
+    example: 'Nairobi Hospital',
+    description: 'Birth facility name',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  birthFacilityName?: string;
+
+  @ApiProperty({
+    example: 'fac123',
+    description: 'Birth facility ID (optional, auto-set from name if provided)',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID('all')
+  birthFacilityId?: string;
 }

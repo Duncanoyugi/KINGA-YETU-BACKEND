@@ -58,10 +58,11 @@ export class ChildrenController {
     @Body() createChildDto: CreateChildDto,
     @Request() req: any,
   ): Promise<ChildResponseDto> {
-    // If parent is registering their own child, ensure parentId matches their ID
-    if (req.user.role === UserRole.PARENT) {
-      const parent = await this.getParentIdFromUser(req.user.id);
-      createChildDto.parentId = parent;
+    // For PARENT role, only override if no parentId provided (admin/health-worker specify it)
+    if (req.user.role === UserRole.PARENT && !createChildDto.parentId) {
+      const parentId = await this.getParentIdFromUser(req.user.id);
+      createChildDto.parentId = parentId;
+      this.logger.log(`[PARENT] Auto-set parentId: ${parentId}`);
     }
     
     return this.childrenService.create(createChildDto, req.user.id);
@@ -220,16 +221,18 @@ export class ChildrenController {
       this.logger.log(`Auto-created parent profile for user: ${userId}`);
       return newParent.id;
     } catch (error) {
-      // If creation fails (e.g., due to race condition), try to fetch again
-      this.logger.warn(`Failed to auto-create parent profile for user ${userId}: ${error.message}`);
-      const existingParent = await this.prisma.parent.findUnique({
-        where: { userId },
-        select: { id: true },
-      });
-      if (existingParent) {
-        return existingParent.id;
-      }
-      throw new NotFoundException('Parent profile not found for user');
+      this.logger.error(`Parent creation error for user ${userId}:`, error);
     }
+    
+    // Always try to fetch - more robust
+    const existingParent = await this.prisma.parent.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (existingParent) {
+      return existingParent.id;
+    }
+    
+    throw new NotFoundException(`Parent profile not found for user ${userId}`);
   }
 }

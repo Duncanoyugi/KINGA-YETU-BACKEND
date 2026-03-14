@@ -8,6 +8,7 @@ import {
   IsOptional,
   Matches,
   IsPhoneNumber,
+  IsUUID,
 } from 'class-validator';
 
 export class CreateChildDto {
@@ -66,19 +67,28 @@ export class CreateChildDto {
 
   @ApiProperty({
     example: 'clm89djs300s0p29jf9s',
-    description: 'Parent ID (user ID of the parent)',
+    description: 'Parent ID (from Parent table, not User ID)',
   })
   @IsString()
   @IsNotEmpty()
   parentId: string;
 
-  @ApiProperty({
-    example: 'clm89djs400s0p29jf0t',
-    description: 'Birth facility ID',
+@ApiProperty({
+    example: 'Nairobi Hospital',
+    description: 'Birth facility name',
     required: false,
   })
   @IsOptional()
   @IsString()
+  birthFacilityName?: string;
+
+  @ApiProperty({
+    example: 'fac123',
+    description: 'Birth facility ID (optional, auto-set from name if provided)',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID('all')
   birthFacilityId?: string;
 
   @ApiProperty({
@@ -125,4 +135,14 @@ export class CreateChildDto {
   @IsOptional()
   @IsString()
   complications?: string;
+
+  @ApiProperty({
+    example: 'Healthy newborn, APGAR 9/10',
+    description: 'Additional notes/observations',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
+
