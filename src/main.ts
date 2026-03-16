@@ -17,28 +17,12 @@ async function bootstrap() {
   console.log('  JWT_ACCESS_EXPIRY:', configService.get('JWT_ACCESS_EXPIRY') || '15m (default)');
   console.log('='.repeat(50));
   
-  // Enable CORS for frontend - production-safe configuration
+  // Enable CORS for frontend - simplified for reliability
   app.enableCors({
-    origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:3000',
-        'https://kinga-yetu-frontend.vercel.app',
-      ];
-
-      // Allow requests with no origin (like mobile apps or curl requests)
-      // Also allow if origin is in allowed list
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Allow-Credentials', 'Access-Control-Allow-Headers'],
+    allowedHeaders: 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Allow-Credentials,Access-Control-Allow-Headers,Access-Control-Allow-Origin',
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
