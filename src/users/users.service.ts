@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../prisma/prisma.service';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,7 +16,10 @@ import { UserResponseDto, PaginatedUsersResponseDto } from './dto/user-response.
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly prisma: PrismaService,
+  ) {}
 
   private async hashPassword(password: string): Promise<string> {
     const saltRounds = 10;
@@ -96,6 +100,17 @@ export class UsersService {
 
     // Create user
     const user = await this.usersRepository.create(createUserDto, hashedPassword);
+
+    // If user is registering as PARENT, automatically create parent profile
+    if (user.role === 'PARENT') {
+      await this.prisma.parent.create({
+        data: {
+          userId: user.id,
+        },
+      });
+      console.log(`✅ [UsersService] Parent profile created for user: ${user.email}`);
+    }
+
     return this.mapToUserResponseDto(user);
   }
 

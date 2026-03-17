@@ -31,8 +31,8 @@ POST {{baseUrl}}/verify-email
 Content-Type: application/json
 
 {
-  "email": "admin.duncan2026@example.com",
-  "otpCode": "729538"
+  "email": "vin@gmail.com",
+  "otpCode": "858674"
 }
 
 ###
