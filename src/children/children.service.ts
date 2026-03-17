@@ -95,8 +95,9 @@ export class ChildrenService {
       throw new NotFoundException(`Parent profile with ID ${createChildDto.parentId} not found`);
     }
 
-    // Check if user is authorized (either parent or admin)
-    if (userId && userId !== createChildDto.parentId) {
+    // Check if user is authorized (either parent owns this profile, or admin/health worker)
+    // FIX: Compare userId with parent.userId, not parent.id (they are different IDs!)
+    if (userId && userId !== parent.userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
       });
@@ -203,14 +204,22 @@ export class ChildrenService {
       throw new NotFoundException(`Child with ID ${id} not found`);
     }
 
-    // Check authorization
-    if (userId && userId !== existingChild.parentId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+    // Check authorization - get the parent to compare with userId
+    if (userId) {
+      const parent = await this.prisma.parent.findUnique({
+        where: { id: existingChild.parentId },
+        select: { userId: true },
       });
+      
+      // FIX: Compare userId with parent.userId, not parent.id
+      if (parent && userId !== parent.userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
 
-      if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'HEALTH_WORKER') {
-        throw new ForbiddenException('You are not authorized to update this child');
+        if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'HEALTH_WORKER') {
+          throw new ForbiddenException('You are not authorized to update this child');
+        }
       }
     }
 
@@ -263,14 +272,22 @@ export class ChildrenService {
       throw new NotFoundException(`Child with ID ${id} not found`);
     }
 
-    // Check authorization
-    if (userId && userId !== child.parentId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+    // Check authorization - get the parent to compare with userId
+    if (userId) {
+      const parent = await this.prisma.parent.findUnique({
+        where: { id: child.parentId },
+        select: { userId: true },
       });
+      
+      // FIX: Compare userId with parent.userId, not parent.id
+      if (parent && userId !== parent.userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
 
-      if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
-        throw new ForbiddenException('You are not authorized to delete this child');
+        if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
+          throw new ForbiddenException('You are not authorized to delete this child');
+        }
       }
     }
 
