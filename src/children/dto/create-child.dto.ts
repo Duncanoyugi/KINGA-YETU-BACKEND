@@ -68,10 +68,11 @@ export class CreateChildDto {
   @ApiProperty({
     example: 'clm89djs300s0p29jf9s',
     description: 'Parent ID (from Parent table, not User ID)',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  parentId: string;
+  parentId?: string;
 
 @ApiProperty({
     example: 'Nairobi Hospital',
