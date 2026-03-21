@@ -85,66 +85,72 @@ export class ChildrenService {
     return months <= 0 ? 0 : months;
   }
 
-  async create(createChildDto: CreateChildDto, userId?: string): Promise<ChildResponseDto> {
-    // Check if parent exists
-    const parent = await this.prisma.parent.findUnique({
-      where: { id: createChildDto.parentId },
+  async create(createChildDto: CreateChildDto, userId: string): Promise<ChildResponseDto> {
+    if (!userId) {
+      throw new BadRequestException('User ID is required');
+    }
+
+    // Derive parent server-side (auto-create if missing)
+    let parent = await this.prisma.parent.findUnique({
+      where: { userId },
     });
 
     if (!parent) {
-      throw new NotFoundException(`Parent profile with ID ${createChildDto.parentId} not found`);
-    }
-
-    // Check if user is authorized (either parent owns this profile, or admin/health worker)
-    // FIX: Compare userId with parent.userId, not parent.id (they are different IDs!)
-    if (userId && userId !== parent.userId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+      parent = await this.prisma.parent.create({
+        data: { userId },
       });
-
-      if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'HEALTH_WORKER') {
-        throw new ForbiddenException('You are not authorized to register children for this parent');
-      }
     }
 
-    // Check if birth certificate number already exists
-    if (createChildDto.birthCertificateNo) {
+    const parentId = parent.id;
+
+    // Merge with DTO
+    const dtoWithParent = { ...createChildDto, parentId };
+
+    // Check authorization for non-owner
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'HEALTH_WORKER' && userId !== parent.userId) {
+      throw new ForbiddenException('Unauthorized to register for this parent');
+    }
+
+    // Check birth certificate
+    if (dtoWithParent.birthCertificateNo) {
       const existingChild = await this.childrenRepository.findByBirthCertificate(
-        createChildDto.birthCertificateNo,
+        dtoWithParent.birthCertificateNo,
       );
       if (existingChild) {
         throw new ConflictException('Birth certificate number already exists');
       }
     }
 
-// Resolve birth facility by name if provided
-    if (createChildDto.birthFacilityName) {
+    // Resolve birth facility
+    if (dtoWithParent.birthFacilityName) {
       const facility = await this.prisma.healthFacility.findFirst({
         where: {
           name: {
-            contains: createChildDto.birthFacilityName.trim(),
+            contains: dtoWithParent.birthFacilityName.trim(),
             mode: 'insensitive'
           },
           isActive: true
         }
       });
       if (!facility) {
-        throw new NotFoundException(`No active facility found matching "${createChildDto.birthFacilityName}"`);
+        throw new NotFoundException(`No active facility found matching "${dtoWithParent.birthFacilityName}"`);
       }
-      // Set ID for repository, remove name
-      (createChildDto as any).birthFacilityId = facility.id;
-      delete (createChildDto as any).birthFacilityName;
+      (dtoWithParent as any).birthFacilityId = facility.id;
+      delete (dtoWithParent as any).birthFacilityName;
     }
 
-    // Validate date of birth (not in future)
-    const dob = new Date(createChildDto.dateOfBirth);
+    // Validate DOB
+    const dob = new Date(dtoWithParent.dateOfBirth);
     const today = new Date();
     if (dob > today) {
       throw new BadRequestException('Date of birth cannot be in the future');
     }
 
-    // Create child
-    const child = await this.childrenRepository.create(createChildDto);
+    const child = await this.childrenRepository.create(dtoWithParent as any);
     return this.mapToChildResponseDto(child);
   }
 

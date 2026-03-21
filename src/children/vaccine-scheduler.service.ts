@@ -52,7 +52,7 @@ export class VaccineSchedulerService {
     private childrenService: ChildrenService,
   ) {}
 
-  async createChildWithSchedule(createChildDto: CreateChildDto, userId?: string): Promise<{
+  async createChildWithSchedule(createChildDto: CreateChildDto, userId: string): Promise<{
     child: ChildResponseDto;
     schedules: any[];
   }> {

@@ -59,15 +59,7 @@ export class ChildrenController {
     @Body() createChildDto: CreateChildDto,
     @Request() req: any,
   ): Promise<ChildResponseDto> {
-    // For PARENT role, always override parentId
-    if (req.user.role === UserRole.PARENT) {
-      const parentId = await this.getParentIdFromUser(req.user.id);
-      createChildDto.parentId = parentId;
-      this.logger.log(`[PARENT] Auto-set parentId: ${parentId}`);
-    } else if (!createChildDto.parentId) {
-      throw new BadRequestException('parentId is required for admins and health workers');
-    }
-    
+    // parentId derived server-side in service from req.user.id
     return this.childrenService.create(createChildDto, req.user.id);
   }
 

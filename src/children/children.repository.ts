@@ -8,7 +8,7 @@ import { UpdateChildDto } from './dto/update-child.dto';
 export class ChildrenRepository {
   constructor(private prisma: PrismaService) {}
 
-  async create(createChildDto: CreateChildDto): Promise<Child> {
+async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Child> {
     const {
       parentId,
       birthFacilityId,
@@ -346,7 +346,7 @@ export class ChildrenRepository {
     });
   }
 
-  async update(id: string, updateChildDto: UpdateChildDto) {
+async update(id: string, updateChildDto: UpdateChildDto & { parentId?: string }): Promise<Child> {
     const {
       parentId,
       birthFacilityId,
