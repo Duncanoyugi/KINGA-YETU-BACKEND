@@ -8,10 +8,12 @@ export class CreateReminderDto {
   @IsString()
   childId: string;
 
-  @ApiProperty({ description: 'Parent ID who will receive the reminder' })
-  @IsNotEmpty()
+
+  @ApiProperty({ description: 'Parent ID who will receive the reminder (optional - auto-derived from childId)' })
+  @IsOptional()
   @IsString()
-  parentId: string;
+  parentId?: string;
+
 
   @ApiProperty({ description: 'Vaccine ID related to this reminder' })
   @IsNotEmpty()

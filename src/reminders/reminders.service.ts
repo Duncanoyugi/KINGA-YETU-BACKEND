@@ -24,11 +24,29 @@ export class RemindersService {
     private readonly reminderEngine: ReminderEngineService,
   ) {}
 
+
   async create(createReminderDto: CreateReminderDto): Promise<ReminderResponseDto> {
+    let dtoParentId = createReminderDto.parentId;
+    
+    if (!dtoParentId) {
+      // Derive parentId from child
+      const child = await this.prisma.child.findUnique({
+        where: { id: createReminderDto.childId },
+        select: { parentId: true },
+      });
+      
+      if (!child) {
+        throw new NotFoundException(`Child with ID ${createReminderDto.childId} not found`);
+      }
+      
+      dtoParentId = child.parentId;
+      createReminderDto.parentId = dtoParentId;
+    }
+
     // Validate child and parent exist
     await this.validateChildAndParent(
       createReminderDto.childId,
-      createReminderDto.parentId,
+      dtoParentId!,
     );
 
     // Validate vaccine exists
@@ -36,15 +54,19 @@ export class RemindersService {
       where: { id: createReminderDto.vaccineId },
     });
 
+
     if (!vaccine) {
       throw new NotFoundException(`Vaccine with ID ${createReminderDto.vaccineId} not found`);
     }
 
+
     const reminder = await this.prisma.reminder.create({
       data: {
         ...createReminderDto,
+        parentId: createReminderDto.parentId!,  // Ensure non-null after derivation/validation
         metadata: createReminderDto['metadata'] || '{}',
       },
+
       include: {
         child: {
           select: {
@@ -501,6 +523,7 @@ export class RemindersService {
   }
 
   // Private helper methods
+
   private async validateChildAndParent(childId: string, parentId: string): Promise<void> {
     const [child, parent] = await Promise.all([
       this.prisma.child.findUnique({
@@ -524,6 +547,7 @@ export class RemindersService {
       throw new BadRequestException('Child does not belong to the specified parent');
     }
   }
+
 
   private buildWhereClause(filters?: ReminderFilterDto): Prisma.ReminderWhereInput {
     const where: Prisma.ReminderWhereInput = {};

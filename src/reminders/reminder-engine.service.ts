@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -288,7 +288,7 @@ export class ReminderEngineService {
   }
 
   /**
-   * Send a reminder through the appropriate channel
+   * Send a reminder through the appropriate channel (public for RemindersService)
    */
   async sendReminder(reminder: any): Promise<void> {
     try {
@@ -348,13 +348,13 @@ export class ReminderEngineService {
 
       // Schedule retry if under limit
       if ((reminder.retryCount || 0) < 3) {
-        await this.scheduleRetry(reminder);
+        this.scheduleRetry(reminder);
       }
     }
   }
 
   /**
-   * Get reminders for a specific child
+   * Get reminders for a specific child (public for RemindersService)
    */
   async getChildReminders(childId: string, includePast: boolean = false): Promise<any[]> {
     const where: Prisma.ReminderWhereInput = { childId };
@@ -379,7 +379,7 @@ export class ReminderEngineService {
   }
 
   /**
-   * Get reminders for a specific parent
+   * Get reminders for a specific parent (public for RemindersService)
    */
   async getParentReminders(parentId: string): Promise<any[]> {
     return await this.prisma.reminder.findMany({
@@ -398,7 +398,7 @@ export class ReminderEngineService {
   }
 
   /**
-   * Get reminder statistics
+   * Get reminder statistics (public for RemindersService)
    */
   async getStatistics(startDate: Date, endDate: Date, facilityId?: string): Promise<any> {
     const where: Prisma.ReminderWhereInput = {
@@ -466,7 +466,7 @@ export class ReminderEngineService {
   }
 
   /**
-   * Acknowledge a reminder (when parent responds)
+   * Acknowledge a reminder (public for RemindersService)
    */
   async acknowledgeReminder(reminderId: string, responseNote?: string): Promise<any> {
     return await this.prisma.reminder.update({
@@ -482,7 +482,7 @@ export class ReminderEngineService {
   }
 
   /**
-   * Bulk create reminders
+   * Bulk create reminders (public for RemindersService)
    */
   async bulkCreateReminders(reminders: CreateReminderDto[]): Promise<{ success: number; failed: number }> {
     let success = 0;
@@ -490,8 +490,36 @@ export class ReminderEngineService {
 
     for (const reminderData of reminders) {
       try {
+        // Derive parentId if missing (match reminders.service.ts logic)
+        let finalParentId = reminderData.parentId;
+        if (!finalParentId) {
+          const child = await this.prisma.child.findUnique({
+            where: { id: reminderData.childId },
+            select: { parentId: true },
+          });
+          
+          if (!child || !child.parentId) {
+            this.logger.error(`Child ${reminderData.childId} not found or has no parent`);
+            failed++;
+            continue;
+          }
+          
+          finalParentId = child.parentId;
+        }
+
+        // Construct Prisma data with guaranteed parentId: string
+        const prismaData = {
+          childId: reminderData.childId,
+          parentId: finalParentId,
+          vaccineId: reminderData.vaccineId,
+          type: reminderData.type,
+          message: reminderData.message,
+          scheduledFor: reminderData.scheduledFor,
+          priority: reminderData.priority || 3,
+        };
+
         await this.prisma.reminder.create({
-          data: reminderData,
+          data: prismaData,
         });
         success++;
       } catch (error) {
@@ -503,7 +531,7 @@ export class ReminderEngineService {
     return { success, failed };
   }
 
-  // Helper methods
+  // Private helper methods
   private calculateTieredReminderDates(dueDate: Date): Date[] {
     const dates: Date[] = [];
     const momentDueDate = moment(dueDate);
@@ -571,7 +599,7 @@ export class ReminderEngineService {
     return 4;
   }
 
-  private async scheduleRetry(reminder: any): Promise<void> {
+  private scheduleRetry(reminder: any): void {
     const retryDelay = Math.pow(2, reminder.retryCount || 1) * 15 * 60 * 1000; // Exponential backoff
     
     setTimeout(async () => {
@@ -595,7 +623,7 @@ export class ReminderEngineService {
     }, retryDelay);
   }
 
-  // These methods would integrate with actual communication services
+  // Private communication methods
   private async sendSmsReminder(reminder: any): Promise<void> {
     const parentPhone = reminder.child?.parent?.user?.phoneNumber;
     
@@ -632,3 +660,4 @@ export class ReminderEngineService {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 }
+

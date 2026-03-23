@@ -1,0 +1,189 @@
+# =====================================================
+# ImmuniTrack Kenya - TESTED API Calls
+# =====================================================
+# All tested API endpoints with working credentials
+# =====================================================
+
+@baseUrl = http://localhost:3000/api
+@authUrl = {{baseUrl}}/auth
+
+# =====================================================
+# PART 1: PARENT TESTS
+# =====================================================
+
+### 1.1 Login as PARENT
+# Credentials: vivian@gmail.com / Vivian@1234
+POST {{authUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "vivian@gmail.com",
+  "password": "Vivian@1234"
+}
+
+### 
+# Copy the accessToken from the response
+# @parentToken = YOUR_ACCESS_TOKEN_HERE
+
+
+### 1.2 Register Child as PARENT (SUCCESS)
+# Requires JWT token
+@parentToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW11bWNvN20wMDAwMXFmMWdrdTIzNmtsIiwiZW1haWwiOiJ2aXZpYW5AZ21haWwuY29tIiwicm9sZSI6IlBBUkVOVCIsImlhdCI6MTc3NDI1ODk2NSwiZXhwIjoxNzc0MjU5ODY1fQ.9D6LI8jdNOd-O_Cv536g_m3b9ebpQp696U8VttOTDXM
+
+POST {{baseUrl}}/children
+Content-Type: application/json
+Authorization: Bearer {{parentToken}}
+
+{
+  "firstName": "Baby",
+  "lastName": "Test",
+  "dateOfBirth": "2025-01-15",
+  "gender": "MALE"
+}
+
+### 
+# Child ID: cmn2zzlaz00028wb9ifkuftia
+
+
+### 1.3 Try to Generate Schedule as PARENT (WILL FAIL - 403)
+# PARENT role cannot generate schedules - requires HEALTH_WORKER/ADMIN
+POST {{baseUrl}}/schedules/generate
+Content-Type: application/json
+Authorization: Bearer {{parentToken}}
+
+{
+  "childId": "cmn2zzlaz00028wb9ifkuftia",
+  "dateOfBirth": "2025-01-15",
+  "generateReminders": true
+}
+
+# =====================================================
+# PART 2: HEALTH_WORKER TESTS
+# =====================================================
+
+### 2.1 Login as HEALTH_WORKER
+# Credentials: vin@gmail.com / Vin@1234
+POST {{authUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "vin@gmail.com",
+  "password": "Vin@1234"
+}
+
+### 
+# @healthWorkerToken = YOUR_ACCESS_TOKEN_HERE
+
+
+### 2.2 Generate Schedule as HEALTH_WORKER (SUCCESS)
+@healthWorkerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW10MW0yNXYwMDBjMjloZDk0Nzk5MTE5IiwiZW1haWwiOiJ2aW5AZ21haWwuY29tIiwicm9sZSI6IkhFQUxUSF9XT1JLRVIiLCJpYXQiOjE3NzQyNTk0NjIsImV4cCI6MTc3NDI2MDM2Mn0.jYV0QCmfTOOqkW4lHEDRj4B4NAKE4mXE4Oxk2RqWioU
+
+POST {{baseUrl}}/schedules/generate
+Content-Type: application/json
+Authorization: Bearer {{healthWorkerToken}}
+
+{
+  "childId": "cmn2zzlaz00028wb9ifkuftia",
+  "dateOfBirth": "2025-01-15",
+  "generateReminders": true
+}
+
+# Response:
+# {
+#   "message": "Schedule generated successfully. 4 reminders created.",
+#   "created": 19,
+#   "updated": 2,
+#   "skipped": 17
+# }
+
+
+### 2.3 View Child's Schedule as HEALTH_WORKER
+GET {{baseUrl}}/schedules/child/cmn2zzlaz00028wb9ifkuftia
+Authorization: Bearer {{healthWorkerToken}}
+
+# Returns 19 vaccines in KEPI schedule
+
+
+# =====================================================
+# PART 3: ADMIN TESTS
+# =====================================================
+
+### 3.1 Login as ADMIN
+# Credentials: admin.duncan2026@example.com / Admin@12345
+POST {{authUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "admin.duncan2026@example.com",
+  "password": "Admin@12345"
+}
+
+### 
+# @adminToken = YOUR_ACCESS_TOKEN_HERE
+
+
+### 3.2 Register Child as ADMIN (SUCCESS)
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW1zdmk2ZmIwMDAwaDhiOW52dm5pMmY0IiwiZW1haWwiOiJhZG1pbi5kdW5jYW4yMDI2QGV4YW1wbGUuY29tIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzc0MjU5NTc1LCJleHAiOjE3NzQyNjA0NzV9.sFB90wdw5g38tISjmUd0c-uZeeUXjncnzZYMz4hM3JA
+
+POST {{baseUrl}}/children
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "firstName": "Admin",
+  "lastName": "Test",
+  "dateOfBirth": "2025-03-01",
+  "gender": "FEMALE"
+}
+
+### 
+# Child ID: cmn30cukv001f8wb9kl00b32n
+
+
+### 3.3 Generate Schedule as ADMIN (SUCCESS)
+POST {{baseUrl}}/schedules/generate
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "childId": "cmn30cukv001f8wb9kl00b32n",
+  "dateOfBirth": "2025-03-01",
+  "generateReminders": true
+}
+
+# Response:
+# {
+#   "message": "Schedule generated successfully. 4 reminders created.",
+#   "created": 19,
+#   "updated": 2,
+#   "skipped": 17
+# }
+
+
+### 3.4 View Admin Child's Schedule
+GET {{baseUrl}}/schedules/child/cmn30cukv001f8wb9kl00b32n
+Authorization: Bearer {{adminToken}}
+
+# Returns 19 vaccines in KEPI schedule
+
+
+# =====================================================
+# PART 4: ADDITIONAL ENDPOINTS
+# =====================================================
+
+### 4.1 Get KEPI Vaccine Schedule
+GET {{baseUrl}}/vaccines/kepi/schedule
+Authorization: Bearer {{adminToken}}
+
+# Returns all vaccines in Kenya's immunization program
+
+
+### 4.2 Get All Children (Parent View)
+GET {{baseUrl}}/children/my-children
+Authorization: Bearer {{parentToken}}
+
+# Returns parent's children
+
+
+### 4.3 Get Health Check
+GET {{baseUrl}}/health

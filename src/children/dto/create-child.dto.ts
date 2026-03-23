@@ -65,7 +65,14 @@ export class CreateChildDto {
   })
   birthCertificateNo?: string;
 
-  // parentId derived server-side from authenticated user - not required in request
+  // parentId is derived server-side from authenticated user
+  @ApiProperty({
+    description: 'Parent ID (optional - derived from authenticated user for PARENT role)',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  parentId?: string;
 
 @ApiProperty({
     example: 'Nairobi Hospital',

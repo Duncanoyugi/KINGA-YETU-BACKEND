@@ -1,0 +1,112 @@
+# =====================================================
+# ImmuniTrack Kenya - Test API Requests
+# =====================================================
+# This file contains HTTP requests to test the API
+# Use with VS Code REST Client extension
+# =====================================================
+
+# =====================================================
+# AUTH - Login first to get token
+# =====================================================
+
+### 1. Login as PARENT (replace with your credentials)
+@baseUrl = http://localhost:3000/api
+@authUrl = {{baseUrl}}/auth
+
+POST {{authUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "vivian@g.com",
+  "password": "Password@123"
+}
+
+### 
+# Copy the accessToken from the response and use it below
+# @token = YOUR_ACCESS_TOKEN_HERE
+
+
+# =====================================================
+# CHILDREN - Register a Child
+# =====================================================
+
+### 2. Register a new child (requires valid JWT token)
+# REPLACE ACCESS_TOKEN with the token from login response
+@childrenUrl = {{baseUrl}}/children
+@token = REPLACE_WITH_YOUR_ACCESS_TOKEN
+
+POST {{childrenUrl}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "firstName": "John",
+  "middleName": "James",
+  "lastName": "Doe",
+  "dateOfBirth": "2025-01-15",
+  "gender": "MALE",
+  "birthCertificateNo": "KC12345678",
+  "birthFacilityName": "Nairobi Hospital"
+}
+
+
+# =====================================================
+# SCHEDULES - Generate Vaccination Schedule
+# =====================================================
+
+### 3. Generate vaccination schedule for a child
+# REPLACE CHILD_ID with the id from the child registration response
+@schedulesUrl = {{baseUrl}}/schedules
+
+POST {{schedulesUrl}}/generate
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "childId": "REPLACE_WITH_CHILD_ID",
+  "dateOfBirth": "2025-01-15",
+  "includeCatchup": false,
+  "generateReminders": true,
+  "reminderDaysBefore": 7
+}
+
+
+# =====================================================
+# VACCINES - Get KEPI Schedule
+# =====================================================
+
+### 4. Get the KEPI vaccine schedule
+GET {{baseUrl}}/vaccines/kepi/schedule
+Authorization: Bearer {{token}}
+
+
+# =====================================================
+# CHILDREN - Get Children List
+# =====================================================
+
+### 5. Get all children (for current parent)
+GET {{childrenUrl}}/my-children
+Authorization: Bearer {{token}}
+
+
+# =====================================================
+# SCHEDULES - Get Child's Schedule
+# =====================================================
+
+### 6. Get vaccination schedule for a specific child
+# REPLACE CHILD_ID with actual child ID
+GET {{schedulesUrl}}/child/REPLACE_WITH_CHILD_ID
+Authorization: Bearer {{token}}
+
+
+# =====================================================
+# REMINDERS - Get Parent's Reminders
+# =====================================================
+
+### 7. Get reminders for a child
+# REPLACE CHILD_ID with actual child ID
+@remindersUrl = {{baseUrl}}/reminders
+
+GET {{remindersUrl}}/child/REPLACE_WITH_CHILD_ID
+Authorization: Bearer {{token}}
+

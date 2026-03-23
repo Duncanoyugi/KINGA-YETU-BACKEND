@@ -91,14 +91,25 @@ export class ChildrenService {
     }
 
     // Derive parent server-side (auto-create if missing)
-    let parent = await this.prisma.parent.findUnique({
-      where: { userId },
-    });
-
-    if (!parent) {
-      parent = await this.prisma.parent.create({
-        data: { userId },
+    // Priority: 1) Use parentId from DTO if provided (for ADMIN/HEALTH_WORKER), 2) Derive from userId
+    let parent;
+    if (createChildDto.parentId) {
+      parent = await this.prisma.parent.findUnique({
+        where: { id: createChildDto.parentId },
       });
+      if (!parent) {
+        throw new NotFoundException('Parent not found');
+      }
+    } else {
+      parent = await this.prisma.parent.findUnique({
+        where: { userId },
+      });
+
+      if (!parent) {
+        parent = await this.prisma.parent.create({
+          data: { userId },
+        });
+      }
     }
 
     const parentId = parent.id;
