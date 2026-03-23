@@ -9,7 +9,9 @@ import {
   Matches,
   IsPhoneNumber,
   IsUUID,
+  IsDefined,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateChildDto {
   @ApiProperty({
@@ -65,13 +67,19 @@ export class CreateChildDto {
   })
   birthCertificateNo?: string;
 
-  // parentId is derived server-side from authenticated user
+  // parentId is derived server-side from authenticated user - NOT required in request
+  // Only used when ADMIN/HEALTH_WORKER creates child for a specific parent
+  // For PARENT role, the backend automatically derives parentId from the authenticated user
   @ApiProperty({
     description: 'Parent ID (optional - derived from authenticated user for PARENT role)',
     required: false,
   })
+  @Transform(({ value }) => {
+    // If value is empty string or null, convert to undefined
+    if (value === '' || value === null) return undefined;
+    return value;
+  })
   @IsOptional()
-  @IsString()
   parentId?: string;
 
 @ApiProperty({

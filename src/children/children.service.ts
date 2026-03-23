@@ -136,22 +136,28 @@ export class ChildrenService {
       }
     }
 
-    // Resolve birth facility
+    // Resolve birth facility - if not found, just skip it (don't fail)
     if (dtoWithParent.birthFacilityName) {
-      const facility = await this.prisma.healthFacility.findFirst({
-        where: {
-          name: {
-            contains: dtoWithParent.birthFacilityName.trim(),
-            mode: 'insensitive'
-          },
-          isActive: true
+      try {
+        const facility = await this.prisma.healthFacility.findFirst({
+          where: {
+            name: {
+              contains: dtoWithParent.birthFacilityName.trim(),
+              mode: 'insensitive'
+            },
+            isActive: true
+          }
+        });
+        if (facility) {
+          (dtoWithParent as any).birthFacilityId = facility.id;
         }
-      });
-      if (!facility) {
-        throw new NotFoundException(`No active facility found matching "${dtoWithParent.birthFacilityName}"`);
+        // If facility not found, just continue without setting birthFacilityId
+        delete (dtoWithParent as any).birthFacilityName;
+      } catch (error) {
+        // If any error occurs during facility lookup, just skip it
+        console.warn('Failed to resolve birth facility:', error.message);
+        delete (dtoWithParent as any).birthFacilityName;
       }
-      (dtoWithParent as any).birthFacilityId = facility.id;
-      delete (dtoWithParent as any).birthFacilityName;
     }
 
     // Validate DOB
