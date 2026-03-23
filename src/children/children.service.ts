@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { ChildrenRepository } from './children.repository';
 import { CreateChildDto } from './dto/create-child.dto';
@@ -13,6 +14,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ChildrenService {
+  private readonly logger = new Logger(ChildrenService.name);
+
   constructor(
     private readonly childrenRepository: ChildrenRepository,
     private readonly prisma: PrismaService,
@@ -90,32 +93,36 @@ export class ChildrenService {
       throw new BadRequestException('User ID is required');
     }
 
-    // Derive parent server-side (auto-create if missing)
-    // Priority: 1) Use parentId from DTO if provided (for ADMIN/HEALTH_WORKER), 2) Derive from userId
-    let parent;
-    if (createChildDto.parentId) {
-      parent = await this.prisma.parent.findUnique({
-        where: { id: createChildDto.parentId },
-      });
-      if (!parent) {
-        throw new NotFoundException('Parent not found');
-      }
-    } else {
-      parent = await this.prisma.parent.findUnique({
-        where: { userId },
-      });
-
-      if (!parent) {
-        parent = await this.prisma.parent.create({
-          data: { userId },
+    try {
+      // Derive parent server-side (auto-create if missing)
+      // Priority: 1) Use parentId from DTO if provided (for ADMIN/HEALTH_WORKER), 2) Derive from userId
+      let parent;
+      if (createChildDto.parentId) {
+        parent = await this.prisma.parent.findUnique({
+          where: { id: createChildDto.parentId },
         });
+        if (!parent) {
+          throw new NotFoundException('Parent not found');
+        }
+      } else {
+        parent = await this.prisma.parent.findUnique({
+          where: { userId },
+        });
+
+        if (!parent) {
+          this.logger.log(`Creating new parent profile for user: ${userId}`);
+          parent = await this.prisma.parent.create({
+            data: { userId },
+          });
+        }
       }
-    }
 
-    const parentId = parent.id;
+      const parentId = parent.id;
+      this.logger.log(`Using parentId: ${parentId}`);
 
-    // Merge with DTO
-    const dtoWithParent = { ...createChildDto, parentId };
+      // Merge with DTO
+      const dtoWithParent = { ...createChildDto, parentId };
+      this.logger.log(`DTO with parent: ${JSON.stringify(dtoWithParent)}`);
 
     // Check authorization for non-owner
     const user = await this.prisma.user.findUnique({
@@ -169,6 +176,10 @@ export class ChildrenService {
 
     const child = await this.childrenRepository.create(dtoWithParent as any);
     return this.mapToChildResponseDto(child);
+      } catch (error) {
+        this.logger.error(`Error creating child: ${error.message}`, error.stack);
+        throw error;
+      }
   }
 
   async findAll(

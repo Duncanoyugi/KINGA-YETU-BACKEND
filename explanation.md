@@ -1,730 +1,1076 @@
 # Kinga Yetu Digital - Backend System Explanation
 
 ## Table of Contents
-1. [Introduction](#introduction)
-2. [System Overview](#system-overview)
-3. [Technology Stack](#technology-stack)
-4. [Database Schema](#database-schema)
-5. [Core Modules](#core-modules)
-6. [Authentication & Authorization](#authentication--authorization)
-7. [User Roles](#user-roles)
-8. [Key Workflows](#key-workflows)
-9. [API Endpoints Overview](#api-endpoints-overview)
+1. [System Overview](#system-overview)
+2. [Technology Stack](#technology-stack)
+3. [Database Schema](#database-schema)
+4. [Core Modules](#core-modules)
+5. [Authentication & Authorization](#authentication--authorization)
+6. [User Roles](#user-roles)
+7. [Key Workflows](#key-workflows)
+8. [API Endpoints Overview](#api-endpoints-overview)
+9. [KEPI Schedule Reference](#kepi-schedule-reference)
 10. [System Flow Examples](#system-flow-examples)
-
----
-
-## Introduction
-
-**Kinga Yetu Digital** (Swahili for "Our Children") is a comprehensive child health and immunization tracking system designed for Kenya's healthcare infrastructure. The system helps track children's vaccination schedules, manage health facility records, send reminders to parents, and generate analytics for public health officials.
-
-This document explains how the backend works as if you're completely new to the system.
 
 ---
 
 ## System Overview
 
-The backend is a RESTful API that serves as the central nervous system for the entire application. It handles:
+**Kinga Yetu Digital** (Swahili for "Our Children") is a comprehensive child health and immunization tracking system designed specifically for Kenya's healthcare infrastructure. The system enables:
 
-1. **User Management** - Authentication, registration, and role-based access
-2. **Child Registration & Tracking** - Managing children's health records
-3. **Vaccination Scheduling** - Following Kenya's KEPI (Kenya Expanded Programme on Immunization) schedule
-4. **Immunization Recording** - Recording when vaccines are administered
-5. **Reminder System** - Sending notifications to parents about upcoming vaccinations
-6. **Health Facility Management** - Managing healthcare facilities and workers
-7. **Reports & Analytics** - Generating coverage reports and predictive analytics
-8. **Notifications** - Multi-channel notifications (Email, SMS, Push)
+- **Child Registration**: Register newborns and track their health journey from birth
+- **Immunization Tracking**: Monitor vaccination schedules based on Kenya's KEPI (Kenya Expanded Programme on Immunization) schedule
+- **Growth Monitoring**: Record and track children's growth metrics over time
+- **Reminder System**: Send automated reminders to parents about upcoming vaccinations
+- **Health Facility Management**: Manage healthcare facilities, health workers, and their activities
+- **Analytics & Reporting**: Generate comprehensive reports on immunization coverage, missed vaccines, and health trends
+- **Multi-channel Notifications**: Send notifications via email, SMS, and push notifications
+
+The system is designed to work in both online and offline-capable environments, with a frontend that can function offline and sync when connectivity is restored.
 
 ---
 
 ## Technology Stack
 
-### Framework & Runtime
-- **NestJS** - A progressive Node.js framework for building efficient, reliable, and scalable server-side applications
-- **TypeScript** - Type-safe JavaScript
-- **Node.js** - JavaScript runtime
+### Backend Technologies
 
-### Database & ORM
-- **PostgreSQL** - Relational database
-- **Prisma** - Modern ORM for type-safe database access
+| Technology | Purpose |
+|------------|---------|
+| **NestJS** | Node.js framework for building scalable server-side applications |
+| **PostgreSQL** | Primary relational database for storing all data |
+| **Prisma ORM** | Database toolkit for type-safe database operations |
+| **JWT (JSON Web Tokens)** | Authentication mechanism for stateless API requests |
+| **Passport.js** | Authentication middleware for Node.js |
+| **Bcrypt** | Password hashing for secure password storage |
+| **Nodemailer** | Email sending functionality |
+| **Twilio** | SMS sending functionality (via their API) |
 
-### Authentication & Security
-- **JWT (JSON Web Tokens)** - Stateless authentication
-- **bcrypt** - Password hashing
-- **Passport.js** - Authentication middleware
+### Key Dependencies
 
-### Additional Libraries
-- **Nodemailer** - Email sending
-- **OTP Generator** - One-time password generation
-- **Moment.js** - Date/time handling
-- **NestJS Schedule** - Cron job scheduling
+```json
+{
+  "@nestjs/common": "^10.x",
+  "@nestjs/core": "^10.x",
+  "@nestjs/jwt": "^10.x",
+  "@nestjs/passport": "^10.x",
+  "@nestjs/config": "^3.x",
+  "@prisma/client": "^5.x",
+  "passport": "^0.7.x",
+  "passport-jwt": "^4.0.x",
+  "bcrypt": "^5.x",
+  "nodemailer": "^6.x"
+}
+```
 
 ---
 
 ## Database Schema
 
-The database is the foundation of the system. Here's a breakdown of the main entities:
+The database consists of 14 interconnected models that store all system data. Here's a detailed breakdown:
 
-### User
-The central entity that represents all system users.
-```typescript
+### 1. User Model
+The central authentication and profile entity.
+
+```prisma
 model User {
-  id              String    // Unique identifier (cuid)
-  email           String    // Unique email address
-  phoneNumber     String?   // Optional phone number
-  password        String    // Hashed password
-  fullName        String    // User's full name
-  role            UserRole  // PARENT, HEALTH_WORKER, ADMIN, SUPER_ADMIN
-  isActive        Boolean   // Account status
-  isEmailVerified Boolean   // Email verification status
-  isPhoneVerified Boolean   // Phone verification status
-  lastLoginAt     DateTime? // Last login timestamp
-  createdAt       DateTime  // Account creation date
-  updatedAt       DateTime  // Last update date
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  phoneNumber        String?   @unique
+  password           String
+  fullName           String
+  role               UserRole  @default(PARENT)
+  isActive           Boolean   @default(true)
+  isEmailVerified    Boolean   @default(false)
+  isPhoneVerified    Boolean   @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 ```
 
-### Parent
-Extends User for parents who manage children's records.
-```typescript
+**Fields:**
+- `id`: Unique identifier (CUID)
+- `email`: User's email (unique, required for login)
+- `phoneNumber`: Optional phone number for SMS notifications
+- `password`: Hashed password
+- `fullName`: User's full name
+- `role`: User's role in the system (PARENT, HEALTH_WORKER, ADMIN, SUPER_ADMIN)
+- `isActive`: Whether the account is active
+- `isEmailVerified`: Whether email has been verified
+- `isPhoneVerified`: Whether phone has been verified
+- `lastLoginAt`: Timestamp of last login
+
+### 2. Parent Model
+Links to User and stores parent-specific information.
+
+```prisma
 model Parent {
-  id               String   // Unique identifier
-  userId           String   // Links to User
-  emergencyContact String?  // Emergency contact name
-  emergencyPhone   String?  // Emergency phone number
-  children         Child[]  // One-to-many relationship with children
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  emergencyContact String?
+  emergencyPhone   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  children         Child[]
+  user             User     @relation(fields: [userId], references: [id])
+  reminders        Reminder[]
 }
 ```
 
-### Child
-Represents a child being tracked in the system.
-```typescript
+**Purpose:** Represents a parent/guardian who can have multiple children registered in the system.
+
+### 3. Child Model
+The core entity representing a child in the system.
+
+```prisma
 model Child {
-  id                  String   // Unique identifier
-  parentId            String   // Links to Parent
-  firstName           String   // Child's first name
-  middleName          String?  // Optional middle name
-  lastName            String   // Child's last name
-  dateOfBirth         DateTime // Birth date (critical for scheduling)
-  gender              Gender   // MALE or FEMALE
-  birthCertificateNo String?  // Optional birth certificate
-  uniqueIdentifier   String   // System-generated unique ID
-  birthFacilityId    String?  // Where child was born
-  immunizations      Immunization[] // Vaccination records
-  schedules          VaccinationSchedule[] // Upcoming vaccines
-  growthRecords      GrowthRecord[] // Growth tracking
+  id                 String   @id @default(cuid())
+  parentId           String
+  firstName          String
+  middleName         String?
+  lastName           String
+  dateOfBirth        DateTime
+  gender             Gender
+  birthCertificateNo String?  @unique
+  uniqueIdentifier   String   @default(cuid())
+  birthFacilityId    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  birthFacility      HealthFacility?
+  parent             Parent   @relation(fields: [parentId], references: [id])
+  developmentRecords DevelopmentRecord[]
+  growthRecords      GrowthRecord[]
+  immunizations      Immunization[]
+  reminders          Reminder[]
+  schedules          VaccinationSchedule[]
 }
 ```
 
-### Vaccine
-Contains information about each vaccine in the KEPI schedule.
-```typescript
+**Fields:**
+- `parentId`: Links to the Parent model
+- `firstName`, `middleName`, `lastName`: Child's name
+- `dateOfBirth`: Child's birth date (critical for calculating vaccination schedules)
+- `gender`: Male or Female
+- `birthCertificateNo`: Optional birth certificate number
+- `uniqueIdentifier`: System-generated unique ID
+- `birthFacilityId`: Where the child was born (optional)
+
+### 4. Vaccine Model
+Stores information about all vaccines in the KEPI schedule.
+
+```prisma
 model Vaccine {
-  id                   String   // Unique identifier
-  code                 String   // Short code (e.g., "BCG", "OPV1")
-  name                 String   // Full name
-  recommendedAgeDays   Int      // When to administer (in days from birth)
-  minAgeDays           Int?     // Earliest allowed age
-  maxAgeDays           Int?     // Latest allowed age
-  isBirthDose          Boolean  // Is this given at birth?
-  isBooster            Boolean  // Is this a booster shot?
-  dosesRequired        String?  // How many doses needed
-  diseasePrevented     String?  // Disease this prevents
-  // ... many more fields
+  id                   String   @id @default(cuid())
+  code                 String   @unique  // e.g., "BCG", "OPV1", "PENTA1"
+  name                 String
+  description          String?
+  administrationRoute  String?  // e.g., "Intramuscular", "Oral"
+  administrationSite   String?  // e.g., "Left upper arm"
+  dosage               String?  // e.g., "0.5ml", "2 drops"
+  dosesRequired        String?  // e.g., "First of 3 doses"
+  sideEffects          String?
+  manufacturer         String?
+  contraindications    String?
+  vaccineType          String?  // e.g., "Live attenuated", "Recombinant"
+  storageRequirements  String?
+  diseasePrevented     String?
+  recommendedAgeDays   Int      // Age in days when vaccine should be given
+  minAgeDays           Int?
+  maxAgeDays           Int?
+  isBirthDose          Boolean  @default(false)
+  isBooster            Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 ```
 
-### Immunization
-Records when a vaccine was actually administered.
-```typescript
+### 5. Immunization Model
+Records each vaccination event.
+
+```prisma
 model Immunization {
-  id               String             // Unique identifier
-  childId          String             // Links to Child
-  vaccineId        String             // Links to Vaccine
-  facilityId       String             // Where administered
-  healthWorkerId   String             // Who administered
-  dateAdministered DateTime           // When administered
-  ageAtDays        Int                // Child's age in days
-  status           ImmunizationStatus // ADMINISTERED, etc.
-  batchNumber      String?            // Vaccine batch
+  id               String             @id @default(cuid())
+  childId          String
+  vaccineId        String
+  facilityId       String
+  healthWorkerId   String
+  administeredBy   String?
+  dateAdministered DateTime           @default(now())
+  ageAtDays        Int
+  status           ImmunizationStatus @default(ADMINISTERED)
+  batchNumber      String?
+  expirationDate   DateTime?
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  child            Child              @relation(fields: [childId], references: [id])
+  facility         HealthFacility     @relation(fields: [facilityId], references: [id])
+  healthWorker     HealthWorker       @relation(fields: [healthWorkerId], references: [id])
+  vaccine          Vaccine            @relation(fields: [vaccineId], references: [id])
 }
 ```
 
-### VaccinationSchedule
-Tracks upcoming vaccinations for each child.
-```typescript
+### 6. VaccinationSchedule Model
+Tracks planned vs actual vaccinations.
+
+```prisma
 model VaccinationSchedule {
-  id        String             // Unique identifier
-  childId   String             // Links to Child
-  vaccineId String             // Links to Vaccine
-  dueDate   DateTime           // When vaccine is due
-  status    ImmunizationStatus // SCHEDULED, ADMINISTERED, MISSED, etc.
+  id        String             @id @default(cuid())
+  childId   String
+  vaccineId String
+  dueDate   DateTime
+  status    ImmunizationStatus @default(SCHEDULED)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  child     Child              @relation(fields: [childId], references: [id])
+  vaccine   Vaccine            @relation(fields: [vaccineId], references: [id])
 }
 ```
 
-### Reminder
-Notifications sent to parents about upcoming vaccinations.
-```typescript
-model Reminder {
-  id           String         // Unique identifier
-  childId      String         // Links to Child
-  parentId     String         // Links to Parent
-  vaccineId    String         // Links to Vaccine
-  type         ReminderType   // VACCINE_DUE, VACCINE_OVERDUE, etc.
-  message      String         // Reminder message
-  scheduledFor DateTime       // When to send
-  status       ReminderStatus // PENDING, SENT, FAILED, etc.
-}
-```
+### 7. HealthFacility Model
+Represents healthcare facilities.
 
-### HealthFacility
-Healthcare facilities in the system.
-```typescript
+```prisma
 model HealthFacility {
-  id        String             // Unique identifier
-  name      String             // Facility name
-  type      HealthFacilityType // HOSPITAL, HEALTH_CENTER, etc.
-  code      String             // Unique code
-  mflCode   String?            // MFL (Master Facility List) code
-  county    String             // Location: County
-  subCounty String             // Location: Sub-county
-  ward      String?            // Location: Ward
-  phone     String?            // Contact phone
-  email     String?            // Contact email
+  id            String             @id @default(cuid())
+  name          String
+  type          HealthFacilityType
+  code          String             @unique
+  mflCode       String?            @unique  // MFL = Master Facility List
+  county        String
+  subCounty     String
+  ward          String?
+  address       String?
+  phone         String?
+  email         String?
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  children      Child[]
+  healthWorkers HealthWorker[]
+  immunizations Immunization[]
 }
 ```
 
-### HealthWorker
-Staff at healthcare facilities.
-```typescript
+### 8. HealthWorker Model
+Links to User and stores health worker-specific information.
+
+```prisma
 model HealthWorker {
-  id             String   // Unique identifier
-  userId         String   // Links to User
-  licenseNumber  String?  // Professional license
-  qualification  String?  // Medical qualification
-  specialization String?  // Area of specialization
-  facilityId     String?  // Where they work
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  licenseNumber  String?         @unique
+  qualification  String?
+  specialization String?
+  facilityId     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  facility       HealthFacility? @relation(fields: [facilityId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  immunizations  Immunization[]
 }
 ```
+
+### 9. Reminder Model
+Stores vaccination reminders.
+
+```prisma
+model Reminder {
+  id           String         @id @default(cuid())
+  childId      String
+  parentId     String
+  vaccineId    String
+  type         ReminderType
+  message      String
+  scheduledFor DateTime
+  status       ReminderStatus @default(PENDING)
+  metadata     String?        @default("{}")
+  retryCount   Int            @default(0)
+  batchNumber  String?
+  errorMessage String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  child        Child          @relation(fields: [childId], references: [id])
+  parent       Parent         @relation(fields: [parentId], references: [id])
+  vaccine      Vaccine        @relation(fields: [vaccineId], references: [id])
+}
+```
+
+### 10. GrowthRecord Model
+Tracks children's growth metrics.
+
+```prisma
+model GrowthRecord {
+  id              String   @id @default(cuid())
+  childId         String
+  measurementDate DateTime @default(now())
+  weight          Float    // in kilograms
+  height          Float?   // in centimeters
+  recordedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  child           Child    @relation(fields: [childId], references: [id])
+  recordedBy      User     @relation(fields: [recordedById], references: [id])
+}
+```
+
+### 11. DevelopmentRecord Model
+Tracks child development milestones.
+
+```prisma
+model DevelopmentRecord {
+  id             String   @id @default(cuid())
+  childId        String
+  assessmentDate DateTime @default(now())
+  motorSkills    String?
+  languageSkills String?
+  socialSkills   String?
+  recordedById   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  child          Child    @relation(fields: [childId], references: [id])
+  recordedBy     User     @relation(fields: [recordedById], references: [id])
+}
+```
+
+### 12. Report Model
+Stores generated reports.
+
+```prisma
+model Report {
+  id            String         @id @default(cuid())
+  title         String
+  type          ReportType
+  description   String?
+  parameters    String         @default("{}")
+  data          String         @default("{}")
+  format        ReportFormat   @default(PDF)
+  frequency     ReportFrequency @default(ON_DEMAND)
+  isPublic      Boolean        @default(false)
+  scheduledFor  DateTime?
+  generatedById String
+  generatedAt   DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  generatedBy   User           @relation(fields: [generatedById], references: [id])
+}
+```
+
+### 13. Notification Model
+Stores user notifications.
+
+```prisma
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      String?          @default("{}")
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id])
+}
+```
+
+### 14. Supporting Models
+- **Otp**: One-time passwords for verification
+- **Session**: Active user sessions
+- **UserProfile**: Extended user profile information
+- **AdminProfile**: Admin-specific profile data
+- **AuditLog**: System audit trail
 
 ---
 
 ## Core Modules
 
-The backend is organized into **16 main modules**, each handling a specific domain:
+The backend consists of 16 main modules, each handling a specific domain:
 
 ### 1. Auth Module (`/auth`)
-Handles all authentication-related functionality:
-- **User Registration** - Creates new user accounts
-- **Login** - Validates credentials and issues JWT tokens
-- **Password Management** - Change password, reset password
-- **Email Verification** - OTP-based email verification
-- **Logout** - Invalidates sessions
+**Purpose:** Handles authentication and authorization
+
+**Key Files:**
+- `auth.service.ts`: Core authentication logic
+- `auth.controller.ts`: REST endpoints
+- `strategies/jwt.strategy.ts`: JWT validation strategy
+- `guards/jwt-auth.guard.ts`: JWT authentication guard
+- `guards/roles.guard.ts`: Role-based access control
+
+**Functionality:**
+- User registration
+- User login (email/password)
+- JWT token generation and validation
+- Password change/reset
+- OTP verification for email/phone
 
 ### 2. Users Module (`/users`)
-Manages user accounts:
-- CRUD operations for users
+**Purpose:** Manages user accounts
+
+**Key Files:**
+- `users.service.ts`: User management logic
+- `users.controller.ts`: REST endpoints
+- `users.repository.ts`: Database operations
+
+**Functionality:**
+- Create, read, update, delete users
+- Query users with filters
+- Change password
 - User profile management
-- User search and filtering
-- Role-based user queries
 
 ### 3. Parents Module (`/parents`)
-Parent-specific functionality:
-- Parent profile management
-- Linking/unlinking children
-- Parent dashboard data
-- Emergency contact management
+**Purpose:** Manages parent profiles
+
+**Key Files:**
+- `parents.service.ts`: Parent management logic
+- `parents.controller.ts`: REST endpoints
+
+**Functionality:**
+- Create parent profile
+- Link children to parents
+- Get parent dashboard data
+- Manage parent emergency contacts
 
 ### 4. Children Module (`/children`)
-Child registration and management:
+**Purpose:** Manages child records
+
+**Key Files:**
+- `children.service.ts`: Child management logic
+- `children.controller.ts`: REST endpoints
+- `children.repository.ts`: Database operations
+- `vaccine-scheduler.service.ts`: Vaccination schedule generation
+
+**Functionality:**
 - Register new children
 - Update child information
-- View child details with immunization history
-- Growth record tracking
-- Development milestone tracking
+- Get child details
+- Search children
+- Auto-generate vaccination schedules upon registration
+- Growth record management
 
 ### 5. Vaccines Module (`/vaccines`)
-Vaccine catalog management:
-- KEPI schedule seed data
-- Vaccine CRUD operations
-- Vaccine search and filtering
-- Vaccine statistics
+**Purpose:** Manages vaccine catalog
+
+**Key Files:**
+- `vaccines.service.ts`: Vaccine management logic
+- `vaccines.controller.ts`: REST endpoints
+- `keni-schedule.service.ts`: KEPI schedule definitions
+
+**Functionality:**
+- CRUD operations for vaccines
+- KEPI schedule management
+- Vaccine seeding (initial data population)
 
 ### 6. Immunizations Module (`/immunizations`)
-Recording vaccine administration:
-- Record new immunizations
-- Update immunization records
-- View immunization history
-- Track immunization status
+**Purpose:** Records vaccination events
+
+**Key Files:**
+- `immunizations.service.ts`: Immunization logic
+- `immunizations.controller.ts`: REST endpoints
+
+**Functionality:**
+- Record vaccinations
+- Update immunization status
+- Get immunization history
+- Track vaccine batch information
 
 ### 7. Schedules Module (`/schedules`)
-Vaccination schedule management:
-- Generate schedules based on child's birth date
-- Calculate due dates using KEPI schedule
-- Track upcoming vaccinations
-- Regenerate missed schedules
+**Purpose:** Manages vaccination schedules
+
+**Key Files:**
+- `schedules.service.ts`: Schedule management logic
+- `schedules.controller.ts`: REST endpoints
+- `schedule-calculator.service.ts`: Schedule calculation
+
+**Functionality:**
+- Generate vaccination schedules
+- Get upcoming vaccines
+- Calculate due dates based on child's DOB
+- Track schedule status
 
 ### 8. Reminders Module (`/reminders`)
-Reminder management:
-- Create manual reminders
-- Generate automatic reminders
-- Track reminder status
-- Bulk reminder operations
+**Purpose:** Manages vaccination reminders
 
-### 9. Reports Module (`/reports`)
-Report generation:
-- Coverage reports
-- Facility statistics
-- Missed vaccines reports
-- Custom report generation
+**Key Files:**
+- `reminders.service.ts`: Reminder logic
+- `reminders.controller.ts`: REST endpoints
+- `reminder-engine.service.ts`: Reminder processing engine
 
-### 10. Notifications Module (`/notifications`)
-Multi-channel notifications:
-- Email notifications
-- SMS notifications
-- Push notifications
-- Notification queue management
+**Functionality:**
+- Create reminders for upcoming vaccinations
+- Process pending reminders
+- Retry failed reminders
+- Track reminder delivery status
+
+### 9. Notifications Module (`/notifications`)
+**Purpose:** Multi-channel notification delivery
+
+**Key Files:**
+- `notifications.service.ts`: Notification logic
+- `notifications.controller.ts`: REST endpoints
+- `notification-queue.service.ts`: Queue management
+- `providers/email.provider.ts`: Email delivery
+- `providers/sms.provider.ts`: SMS delivery
+- `providers/push.provider.ts`: Push notifications
+
+**Functionality:**
+- Send email notifications
+- Send SMS notifications
+- Send push notifications
+- Queue and retry failed notifications
+- Template-based notifications
+
+### 10. Reports Module (`/reports`)
+**Purpose:** Generate various reports
+
+**Key Files:**
+- `reports.service.ts`: Report generation logic
+- `reports.controller.ts`: REST endpoints
+- `report-generator.service.ts`: Report generation engine
+- `templates/coverage-report.template.ts`: Coverage report template
+- `templates/facility-report.template.ts`: Facility report template
+
+**Functionality:**
+- Generate immunization coverage reports
+- Generate facility statistics reports
+- Generate missed vaccines reports
+- Export reports in various formats
 
 ### 11. Analytics Module (`/analytics`)
-Data analysis and predictions:
-- Immunization trends
-- Coverage analysis
-- Outbreak risk prediction
-- Performance metrics
+**Purpose:** Data analysis and predictions
+
+**Key Files:**
+- `analytics.service.ts`: Analytics logic
+- `analytics.controller.ts`: REST endpoints
+- `data-mining.service.ts`: Data mining operations
+- `models/prediction.model.ts`: Prediction models
+
+**Functionality:**
+- Calculate immunization coverage rates
+- Predict missed vaccinations
+- Generate county-level statistics
+- Dashboard data for county admins
 
 ### 12. Facilities Module (`/facilities`)
-Health facility management:
+**Purpose:** Manages health facilities
+
+**Key Files:**
+- `facilities.service.ts`: Facility management
+- `facilities.controller.ts`: REST endpoints
+- `facilities.repository.ts`: Database operations
+
+**Functionality:**
 - CRUD operations for facilities
-- Search by county/sub-county
-- MFL code management
+- Search facilities by county/sub-county
+- Manage facility status (active/inactive)
 
 ### 13. Mailer Module (`/mailer`)
-Email sending:
-- SMTP configuration
-- Template-based emails
-- OTP emails
-- Report delivery
+**Purpose:** Email sending
+
+**Key Files:**
+- `mailer.service.ts`: Email sending logic
+- `mailer.controller.ts`: REST endpoints
+
+**Functionality:**
+- Send transactional emails
+- Email template management
+- Email queue processing
 
 ### 14. OTP Module (`/otp`)
-One-time password handling:
+**Purpose:** One-time password management
+
+**Key Files:**
+- `otp.service.ts`: OTP logic
+- `otp.controller.ts`: REST endpoints
+
+**Functionality:**
 - Generate OTPs
-- Validate OTPs
+- Verify OTPs
 - OTP expiration management
 
 ### 15. Prisma Module (`/prisma`)
-Database connection:
-- Prisma service singleton
-- Database transaction support
+**Purpose:** Database connection management
+
+**Key Files:**
+- `prisma.service.ts`: Prisma client management
+- `prisma.module.ts`: Prisma module definition
+
+**Functionality:**
+- Database connection management
+- Transaction support
+- Query logging (development)
+
+### 16. App Module (`/app`)
+**Purpose:** Root application module
+
+**Key Files:**
+- `app.module.ts`: Root module
+- `main.ts`: Application entry point
+
+**Functionality:**
+- Module orchestration
+- Global middleware configuration
+- CORS configuration
 
 ---
 
 ## Authentication & Authorization
 
-### How Authentication Works
+### Authentication Flow
 
-1. **Registration**
-   - User submits email, password, full name, and role
-   - System hashes password using bcrypt (10 rounds)
-   - Creates User record and role-specific profile (Parent, HealthWorker, or Admin)
-   - Generates OTP for email verification
-   - Sends verification email
-   - Returns JWT access token
+The system uses JWT (JSON Web Token) for authentication:
 
-2. **Login**
+1. **User Registration:**
+   - User submits email, password, full name, phone number (optional)
+   - System validates data, hashes password using bcrypt
+   - Creates user record in database
+   - Returns access token
+
+2. **User Login:**
    - User submits email and password
-   - System verifies:
-     - User exists
-     - Account is active
-     - Email is verified
-     - Password matches (bcrypt comparison)
-   - On success: Returns JWT access token with user data
-   - On failure: Returns 401 Unauthorized
+   - System validates credentials
+   - Generates JWT access token (15-minute expiry)
+   - Returns token to client
 
-3. **JWT Token**
-   - Contains: user ID (sub), email, role
-   - Expiry: 15 minutes (configurable)
-   - Sent in Authorization header: `Bearer <token>`
+3. **Token Validation:**
+   - Each protected request includes JWT in Authorization header
+   - JWT Strategy validates token signature and expiration
+   - Extracts user ID and role from token
+   - Makes user available in request object
 
-### How Authorization Works
+### Authorization (RBAC)
 
-The system uses **Role-Based Access Control (RBAC)**:
+The system implements Role-Based Access Control (RBAC):
 
-1. **JWT Auth Guard** - Verifies valid JWT token
-2. **Roles Guard** - Checks if user's role matches required role
-3. **Roles Decorator** - Specifies required roles on endpoints
+| Role | Permissions |
+|------|-------------|
+| **PARENT** | Register children, view own children, record immunizations (via health worker), view reminders |
+| **HEALTH_WORKER** | All PARENT permissions + record immunizations, manage children at their facility, view facility reports |
+| **ADMIN** | Manage users, manage facilities, view all reports, manage vaccines |
+| **SUPER_ADMIN** | All permissions + system configuration, manage admins |
 
-Example:
-```typescript
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN)
-@Post('immunizations')
-async recordImmunization(...) { }
-```
+### Guards
+
+- **JwtAuthGuard**: Validates JWT token on protected routes
+- **RolesGuard**: Checks user role against allowed roles for endpoint
+
+### Decorators
+
+- **@Roles('ROLE_NAME')**: Specifies required role for endpoint
+- **@CurrentUser()**: Extracts current user from request
 
 ---
 
 ## User Roles
 
-The system supports **4 user roles**:
+### PARENT
+- Default role for new registrations
+- Can register children under their account
+- Can view their children's immunization records
+- Receives reminders for upcoming vaccinations
+- Can update their profile
 
-### 1. PARENT
-- Register children
-- View own children's records
-- Receive vaccination reminders
-- Update own profile
+### HEALTH_WORKER
+- Typically assigned by administrators
+- Can record immunizations at their facility
+- Can view children registered at their facility
+- Can access facility-level reports
+- Can update child information
 
-### 2. HEALTH_WORKER
-- Record immunizations
-- Register children at their facility
-- View facility statistics
-- Manage vaccination schedules
+### ADMIN
+- Manages health workers and facilities
+- Can access all data within their jurisdiction
+- Can generate reports
+- Can manage vaccine catalog
+- Typically county-level administrators
 
-### 3. ADMIN
-- Manage users
-- Manage facilities
-- Generate reports
-- View system analytics
-
-### 4. SUPER_ADMIN
-- All admin privileges
-- System configuration
-- Manage other admins
+### SUPER_ADMIN
+- System-wide access
+- Can create other admins
+- Can modify system configuration
+- Access to all features
 
 ---
 
 ## Key Workflows
 
-### Workflow 1: Parent Registers a Child
+### 1. Child Registration Flow
 
 ```
-1. Parent logs in (receives JWT token)
-2. Parent calls POST /api/children with:
-   - firstName, lastName, dateOfBirth, gender
-3. Backend:
-   a. Finds Parent profile from JWT user ID
-   b. Creates Child record linked to Parent
-   c. Calculates vaccination schedule based on dateOfBirth
-   d. Creates VaccinationSchedule records for each KEPI vaccine
-   e. Returns child data with schedules
-4. Frontend displays upcoming vaccinations
+1. Parent logs in (receives JWT)
+2. Parent submits child registration form:
+   - Child's first name, middle name, last name
+   - Date of birth
+   - Gender
+   - Birth certificate number (optional)
+   - Birth facility (optional)
+3. System:
+   - Validates input
+   - Creates Parent profile if not exists
+   - Creates Child record
+   - Auto-generates vaccination schedule based on DOB
+   - Creates reminders for each scheduled vaccine
+4. Returns created child with full schedule
 ```
 
-### Workflow 2: Health Worker Records Immunization
+### 2. Immunization Recording Flow
 
 ```
-1. Health Worker logs in
-2. Health Worker calls POST /api/immunizations with:
-   - childId, vaccineId, facilityId, dateAdministered
-3. Backend:
-   a. Validates child exists
-   b. Validates vaccine exists
-   c. Validates facility exists
-   d. Creates Immunization record
-   e. Updates VaccinationSchedule status to ADMINISTERED
-   f. Returns immunization record
-4. Parent receives notification (if enabled)
+1. Health worker logs in
+2. Health worker searches for child (by name, ID, or birth certificate)
+3. Health worker selects vaccine to administer
+4. System:
+   - Validates child exists and vaccine is due
+   - Creates Immunization record
+   - Updates VaccinationSchedule status
+   - Marks reminder as completed
+5. Returns immunization record
 ```
 
-### Workflow 3: Automatic Reminder Generation
+### 3. Reminder Processing Flow
 
 ```
-1. Reminder Engine runs on schedule (cron job)
-2. For each upcoming vaccination (due within 7 days):
-   a. Check if reminder already sent
-   b. Create Reminder record
-   c. Queue notification (Email/SMS/Push)
-3. Notification Service processes queue:
-   a. Send via appropriate provider
-   b. Update reminder status to SENT
-4. Parent receives reminder
+1. Reminder engine runs on schedule (e.g., every hour)
+2. For each pending reminder:
+   - Check if reminder time has passed
+   - Send notification via appropriate channel (email/SMS/push)
+   - On success: mark reminder as SENT
+   - On failure: increment retry count
+   - If max retries exceeded: mark as FAILED
+3. Log results for monitoring
 ```
 
-### Workflow 4: Parent Views Dashboard
+### 4. Report Generation Flow
 
 ```
-1. Parent logs in
-2. Parent calls GET /api/parents/:id/dashboard
-3. Backend:
-   a. Fetches parent profile
-   b. Fetches all children with:
-      - Immunization history
-      - Upcoming schedules
-      - Growth records
-   c. Calculates statistics:
-      - Total children
-      - Fully immunized children
-      - Upcoming vaccinations
-      - Overdue vaccinations
-   d. Returns dashboard object with children and stats
-4. Frontend displays dashboard
+1. Admin requests report (e.g., coverage report)
+2. System:
+   - Validates report parameters
+   - Queries database for required data
+   - Processes data according to report template
+   - Generates report (PDF/JSON/CSV)
+3. Returns report to user
+4. Stores report in database
 ```
 
 ---
 
 ## API Endpoints Overview
 
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/auth/register | Register new user |
-| POST | /api/auth/login | Login user |
-| POST | /api/auth/logout | Logout user |
-| POST | /api/auth/verify-email | Verify email with OTP |
-| POST | /api/auth/change-password | Change password |
-| POST | /api/auth/reset-password | Request password reset |
+### Authentication Endpoints
 
-### Users
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/users | List users (paginated) |
-| GET | /api/users/:id | Get user by ID |
-| PATCH | /api/users/:id | Update user |
-| DELETE | /api/users/:id | Delete user |
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/auth/register` | Register new user | No |
+| POST | `/api/auth/login` | Login user | No |
+| POST | `/api/auth/refresh` | Refresh access token | Yes |
+| POST | `/api/auth/change-password` | Change password | Yes |
+| POST | `/api/auth/forgot-password` | Request password reset | No |
+| POST | `/api/auth/reset-password` | Reset password with token | No |
 
-### Parents
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/parents | List parents |
-| GET | /api/parents/:id | Get parent profile |
-| GET | /api/parents/:id/dashboard | Get parent dashboard |
-| POST | /api/parents | Create parent profile |
-| PATCH | /api/parents/:id | Update parent profile |
-| POST | /api/parents/:id/children | Link child to parent |
-| DELETE | /api/parents/:id/children/:childId | Unlink child |
+### User Endpoints
 
-### Children
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/children | List children |
-| GET | /api/children/my-children | Get parent's children |
-| GET | /api/children/:id | Get child details |
-| POST | /api/children | Register new child |
-| PATCH | /api/children/:id | Update child |
-| DELETE | /api/children/:id | Delete child |
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/users` | List users (paginated) | Yes (Admin) |
+| GET | `/api/users/:id` | Get user by ID | Yes |
+| PATCH | `/api/users/:id` | Update user | Yes |
+| DELETE | `/api/users/:id` | Delete user | Yes (Admin) |
 
-### Vaccines
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/vaccines | List vaccines |
-| GET | /api/vaccines/:id | Get vaccine details |
-| POST | /api/vaccines | Create vaccine |
-| PATCH | /api/vaccines/:id | Update vaccine |
+### Parent Endpoints
 
-### Immunizations
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/immunizations | List immunizations |
-| GET | /api/immunizations/:id | Get immunization |
-| POST | /api/immunizations | Record immunization |
-| PATCH | /api/immunizations/:id | Update immunization |
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/parents/me` | Get current parent's profile | Yes |
+| GET | `/api/parents/:id` | Get parent by ID | Yes |
+| GET | `/api/parents/:id/dashboard` | Get parent dashboard data | Yes |
+| PATCH | `/api/parents/:id` | Update parent profile | Yes |
 
-### Schedules
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/schedules | List schedules |
-| GET | /api/schedules/child/:childId | Get child's schedules |
-| POST | /api/schedules/generate | Generate schedule for child |
-| POST | /api/schedules/regenerate | Regenerate missed schedules |
+### Child Endpoints
 
-### Reminders
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/reminders | List reminders |
-| GET | /api/reminders/parent/:parentId | Get parent's reminders |
-| POST | /api/reminders | Create reminder |
-| POST | /api/reminders/generate | Generate bulk reminders |
-| PATCH | /api/reminders/:id | Update reminder |
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/children` | Register new child | Yes |
+| GET | `/api/children` | List children (paginated) | Yes |
+| GET | `/api/children/:id` | Get child by ID | Yes |
+| GET | `/api/children/parent/:parentId` | Get children by parent | Yes |
+| PATCH | `/api/children/:id` | Update child | Yes |
+| DELETE | `/api/children/:id` | Delete child | Yes |
 
-### Reports
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/reports | List reports |
-| GET | /api/reports/:id | Get report |
-| POST | /api/reports | Create report |
-| GET | /api/reports/coverage | Generate coverage report |
-| GET | /api/reports/facility-stats | Get facility statistics |
+### Vaccine Endpoints
 
-### Analytics
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/analytics | Get analytics data |
-| GET | /api/analytics/predictions | Get predictions |
-| GET | /api/analytics/outbreak-risk | Get outbreak risk |
-| GET | /api/analytics/dashboard | Get admin dashboard |
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/vaccines` | List all vaccines | Yes |
+| GET | `/api/vaccines/:id` | Get vaccine by ID | Yes |
+| POST | `/api/vaccines` | Create vaccine | Yes (Admin) |
+| PATCH | `/api/vaccines/:id` | Update vaccine | Yes (Admin) |
+| DELETE | `/api/vaccines/:id` | Delete vaccine | Yes (Admin) |
 
-### Facilities
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/facilities | List facilities |
-| GET | /api/facilities/:id | Get facility |
-| GET | /api/facilities/county/:county | Get facilities by county |
-| POST | /api/facilities | Create facility |
-| PATCH | /api/facilities/:id | Update facility |
+### Immunization Endpoints
 
-### Notifications
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/notifications | List notifications |
-| POST | /api/notifications | Send notification |
-| PATCH | /api/notifications/:id/read | Mark as read |
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/immunizations` | Record immunization | Yes |
+| GET | `/api/immunizations` | List immunizations | Yes |
+| GET | `/api/immunizations/:id` | Get immunization by ID | Yes |
+| GET | `/api/immunizations/child/:childId` | Get immunizations for child | Yes |
+| PATCH | `/api/immunizations/:id` | Update immunization | Yes |
 
----
+### Schedule Endpoints
 
-## System Flow Examples
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/schedules` | List schedules | Yes |
+| GET | `/api/schedules/child/:childId` | Get schedule for child | Yes |
+| GET | `/api/schedules/upcoming` | Get upcoming vaccines | Yes |
+| POST | `/api/schedules/generate` | Generate schedule for child | Yes |
 
-### Example 1: Complete Child Registration Flow
+### Reminder Endpoints
 
-```
-Scenario: A parent wants to register their newborn baby
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/reminders` | List reminders | Yes |
+| GET | `/api/reminders/:id` | Get reminder by ID | Yes |
+| GET | `/api/reminders/child/:childId` | Get reminders for child | Yes |
+| PATCH | `/api/reminders/:id` | Update reminder | Yes |
 
-1. Parent registers an account:
-   POST /api/auth/register
-   Body: { "email": "parent@example.com", "password": "secure123", 
-           "fullName": "John Doe", "role": "PARENT" }
-   Response: { "user": {...}, "accessToken": "eyJ...", 
-               "message": "Please check your email for verification code" }
+### Report Endpoints
 
-2. Parent verifies email:
-   POST /api/auth/verify-email
-   Body: { "email": "parent@example.com", "code": "123456" }
-   Response: { "message": "Email verified successfully" }
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/api/reports/generate` | Generate report | Yes |
+| GET | `/api/reports` | List generated reports | Yes |
+| GET | `/api/reports/:id` | Get report by ID | Yes |
+| GET | `/api/reports/:id/download` | Download report file | Yes |
 
-3. Parent logs in:
-   POST /api/auth/login
-   Body: { "email": "parent@example.com", "password": "secure123" }
-   Response: { "user": {...}, "accessToken": "eyJ..." }
+### Analytics Endpoints
 
-4. Parent registers child:
-   POST /api/children (with JWT in header)
-   Body: { "firstName": "Baby", "lastName": "Doe", 
-           "dateOfBirth": "2024-01-15", "gender": "MALE" }
-   Response: { 
-     "id": "child_123",
-     "firstName": "Baby",
-     "lastName": "Doe",
-     "dateOfBirth": "2024-01-15",
-     "schedules": [
-       { "vaccineName": "BCG", "dueDate": "2024-01-15", "status": "SCHEDULED" },
-       { "vaccineName": "OPV0", "dueDate": "2024-01-15", "status": "SCHEDULED" },
-       { "vaccineName": "HEPB0", "dueDate": "2024-01-15", "status": "SCHEDULED" },
-       { "vaccineName": "OPV1", "dueDate": "2024-02-26", "status": "SCHEDULED" },
-       // ... more KEPI vaccines
-     ]
-   }
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/analytics/coverage` | Get coverage analytics | Yes |
+| GET | `/api/analytics/missed` | Get missed vaccines | Yes |
+| GET | `/api/analytics/dashboard` | Get dashboard data | Yes |
+| GET | `/api/analytics/predictions` | Get predictions | Yes |
 
-5. System automatically generates reminders for upcoming vaccines
-```
+### Facility Endpoints
 
-### Example 2: Health Worker Records Vaccination
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/facilities` | List facilities | Yes |
+| GET | `/api/facilities/:id` | Get facility by ID | Yes |
+| POST | `/api/facilities` | Create facility | Yes (Admin) |
+| PATCH | `/api/facilities/:id` | Update facility | Yes (Admin) |
 
-```
-Scenario: A health worker records that a child received their BCG vaccine
+### Notification Endpoints
 
-1. Health worker logs in (with HEALTH_WORKER role)
-2. Health worker finds the child:
-   GET /api/children/child_123
-   Response: { "id": "child_123", "firstName": "Baby", ... }
-
-3. Health worker records immunization:
-   POST /api/immunizations (with JWT in header)
-   Body: { 
-     "childId": "child_123",
-     "vaccineId": "vaccine_bcg",
-     "facilityId": "facility_001",
-     "dateAdministered": "2024-01-15"
-   }
-   Response: {
-     "id": "imm_001",
-     "childId": "child_123",
-     "vaccineId": "vaccine_bcg",
-     "status": "ADMINISTERED",
-     "dateAdministered": "2024-01-15"
-   }
-
-4. System updates schedule status to ADMINISTERED
-5. Parent receives notification about the vaccination
-```
-
-### Example 3: Parent Views Dashboard
-
-```
-Scenario: A parent wants to see their children's vaccination status
-
-1. Parent logs in
-2. Parent requests dashboard:
-   GET /api/parents/parent_123/dashboard (with JWT in header)
-   Response: {
-     "parent": { "id": "parent_123", "fullName": "John Doe", ... },
-     "children": [
-       {
-         "id": "child_123",
-         "firstName": "Baby",
-         "lastName": "Doe",
-         "dateOfBirth": "2024-01-15",
-         "ageInMonths": 6,
-         "immunizations": [
-           { "vaccineName": "BCG", "dateAdministered": "2024-01-15", "status": "ADMINISTERED" },
-           { "vaccineName": "OPV1", "dateAdministered": "2024-02-26", "status": "ADMINISTERED" }
-         ],
-         "schedules": [
-           { "vaccineName": "MEASLES", "dueDate": "2024-07-15", "status": "SCHEDULED" }
-         ]
-       }
-     ],
-     "stats": {
-       "totalChildren": 1,
-       "fullyImmunized": 0,
-       "upcomingVaccinations": 1,
-       "overdueVaccinations": 0
-     }
-   }
-
-3. Frontend displays dashboard with all information
-```
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/api/notifications` | List notifications | Yes |
+| GET | `/api/notifications/unread` | Get unread notifications | Yes |
+| PATCH | `/api/notifications/:id/read` | Mark as read | Yes |
+| POST | `/api/notifications/send` | Send notification | Yes |
 
 ---
 
 ## KEPI Schedule Reference
 
-The system implements Kenya's Expanded Programme on Immunization (KEPI) schedule:
+The Kenya Expanded Programme on Immunization (KEPI) schedule defines when each vaccine should be administered:
 
-| Age | Vaccine | Code |
-|-----|---------|------|
-| Birth | Bacillus Calmette-Guérin | BCG |
-| Birth | Oral Polio Vaccine 0 | OPV0 |
-| Birth | Hepatitis B Birth Dose | HEPB0 |
-| 6 weeks | Oral Polio Vaccine 1 | OPV1 |
-| 6 weeks | Pentavalent 1 | PENTA1 |
-| 6 weeks | PCV 1 | PCV1 |
-| 6 weeks | Rotavirus 1 | ROTA1 |
-| 10 weeks | Oral Polio Vaccine 2 | OPV2 |
-| 10 weeks | Pentavalent 2 | PENTA2 |
-| 10 weeks | PCV 2 | PCV2 |
-| 10 weeks | Rotavirus 2 | ROTA2 |
-| 14 weeks | Oral Polio Vaccine 3 | OPV3 |
-| 14 weeks | Pentavalent 3 | PENTA3 |
-| 14 weeks | PCV 3 | PCV3 |
-| 14 weeks | Rotavirus 3 | ROTA3 |
-| 6 months | Vitamin A | VITA1 |
-| 9 months | Measles | MEASLES |
-| 9 months | Rubella | RUBELLA1 |
-| 12 months | Yellow Fever | YELLOW_FEVER |
-| 18 months | DPT Booster 1 | DPT_BOOST1 |
-| 18 months | OPV Booster | OPV_BOOST |
-| 18 months | Vitamin A | VITA2 |
-| 24 months | Vitamin A | VITA3 |
+### Birth Dose (Day 0)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Bacillus Calmette-Guérin | BCG | Tuberculosis | Intradermal (left arm) |
+| Oral Polio Vaccine 0 | OPV0 | Polio | Oral (2 drops) |
+| Hepatitis B Birth Dose | HEPB0 | Hepatitis B | Intramuscular |
+
+### 6 Weeks (42 days)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Oral Polio Vaccine 1 | OPV1 | Polio | Oral |
+| Pentavalent 1 | PENTA1 | DPT+HepB+Hib | Intramuscular |
+| Pneumococcal Conjugate Vaccine 1 | PCV1 | Pneumonia | Intramuscular |
+| Rotavirus Vaccine 1 | RV1 | Rotavirus | Oral |
+| Inactivated Polio Vaccine 1 | IPV1 | Polio | Intramuscular |
+
+### 10 Weeks (70 days)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Pentavalent 2 | PENTA2 | DPT+HepB+Hib | Intramuscular |
+| PCV2 | PCV2 | Pneumonia | Intramuscular |
+| RV2 | RV2 | Rotavirus | Oral |
+
+### 14 Weeks (98 days)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Pentavalent 3 | PENTA3 | DPT+HepB+Hib | Intramuscular |
+| OPV3 | OPV3 | Polio | Oral |
+| PCV3 | PCV3 | Pneumonia | Intramuscular |
+| IPV2 | IPV2 | Polio | Intramuscular |
+
+### 6 Months (180 days)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Vitamin A | VIT-A | Vitamin A deficiency | Oral |
+| Measles-Rubella 1 | MR1 | Measles + Rubella | Subcutaneous |
+
+### 9 Months (270 days)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Measles-Rubella 1 | MR1 | Measles + Rubella | Subcutaneous |
+| Yellow Fever | YF | Yellow Fever | Subcutaneous |
+
+### 12 Months (365 days)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Vitamin A | VIT-A | Vitamin A deficiency | Oral |
+
+### 18 Months (540 days)
+
+| Vaccine | Code | Disease Prevented | Route |
+|---------|------|-------------------|-------|
+| Measles-Rubella 2 | MR2 | Measles + Rubella | Subcutaneous |
+| Vitamin A | VIT-A | Vitamin A deficiency | Oral |
+
+---
+
+## System Flow Examples
+
+### Example 1: Parent Registering a Newborn
+
+**Scenario:** A mother (Sarah) just gave birth at Nairobi West Hospital and wants to register her baby in the system.
+
+**Steps:**
+
+1. **Sarah logs in:**
+   ```
+   POST /api/auth/login
+   Body: { "email": "sarah@email.com", "password": "secure123" }
+   Response: { "accessToken": "eyJhbGciOiJIUzI1NiIs...", "user": {...} }
+   ```
+
+2. **Sarah registers her baby:**
+   ```
+   POST /api/children
+   Headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIs..." }
+   Body: {
+     "firstName": "Emmanuel",
+     "lastName": "Ochieng",
+     "dateOfBirth": "2024-01-15",
+     "gender": "MALE",
+     "birthFacilityName": "Nairobi West Hospital"
+   }
+   ```
+
+3. **System creates child and generates schedule:**
+   - Creates Child record with unique ID
+   - Creates Parent profile if not exists
+   - Generates vaccination schedule starting from birth date
+   - Creates reminders for each vaccine
+   - Returns child with full schedule
+
+4. **Sarah views her dashboard:**
+   ```
+   GET /api/parents/me/dashboard
+   Headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIs..." }
+   Response: {
+     "children": [...],
+     "upcomingVaccines": [...],
+     "reminders": [...]
+   }
+   ```
+
+### Example 2: Health Worker Recording Vaccination
+
+**Scenario:** A health worker at Nairobi West Hospital needs to record that they administered BCG and OPV0 to Emmanuel.
+
+**Steps:**
+
+1. **Health worker logs in:**
+   ```
+   POST /api/auth/login
+   Body: { "email": "nurse@hospital.com", "password": "nurse123" }
+   Response: { "accessToken": "...", "user": { "role": "HEALTH_WORKER" } }
+   ```
+
+2. **Health worker finds the child:**
+   ```
+   GET /api/children?search=Emmanuel
+   Headers: { "Authorization": "Bearer ..." }
+   Response: { "data": [{ "id": "child_123", "firstName": "Emmanuel", ... }] }
+   ```
+
+3. **Health worker records immunization:**
+   ```
+   POST /api/immunizations
+   Headers: { "Authorization": "Bearer ..." }
+   Body: {
+     "childId": "child_123",
+     "vaccineCode": "BCG",
+     "facilityId": "facility_456",
+     "dateAdministered": "2024-01-15",
+     "batchNumber": "BCG2024001"
+   }
+   ```
+
+4. **System updates records:**
+   - Creates Immunization record
+   - Updates VaccinationSchedule status to ADMINISTERED
+   - Marks related reminder as completed
+
+### Example 3: Generating Coverage Report
+
+**Scenario:** A county administrator wants to generate an immunization coverage report for their county.
+
+**Steps:**
+
+1. **Admin logs in:**
+   ```
+   POST /api/auth/login
+   Body: { "email": "admin@county.go.ke", "password": "admin123" }
+   Response: { "accessToken": "...", "user": { "role": "ADMIN" } }
+   ```
+
+2. **Admin requests report:**
+   ```
+   POST /api/reports/generate
+   Headers: { "Authorization": "Bearer ..." }
+   Body: {
+     "type": "COVERAGE",
+     "parameters": {
+       "county": "Nairobi",
+       "startDate": "2024-01-01",
+       "endDate": "2024-03-31"
+     },
+     "format": "PDF"
+   }
+   ```
+
+3. **System generates report:**
+   - Queries all children born in date range
+   - Checks immunization records for each
+   - Calculates coverage percentages
+   - Generates PDF document
+   - Returns report with download URL
 
 ---
 
 ## Summary
 
-Kinga Yetu Digital's backend is a comprehensive child health tracking system built with modern technologies. It provides:
+Kinga Yetu Digital is a comprehensive child health tracking system built with modern technologies. It provides:
 
-1. **Secure Authentication** - JWT-based auth with role-based access control
-2. **Complete Child Tracking** - From birth through vaccination schedule completion
-3. **KEPI Compliance** - Automatic schedule generation based on Kenya's immunization program
-4. **Multi-channel Notifications** - Email, SMS, and push notifications for reminders
-5. **Analytics & Reporting** - Data-driven insights for public health decision-making
-6. **Scalable Architecture** - Modular NestJS design that can grow with the system
+1. **Complete Child Health Tracking**: From birth through childhood vaccinations
+2. **Automated Scheduling**: KEPI-based vaccination schedules generated automatically
+3. **Multi-channel Notifications**: Email, SMS, and push notifications for reminders
+4. **Role-based Access**: Secure access control for different user types
+5. **Comprehensive Reporting**: Coverage reports, missed vaccines, facility statistics
+6. **Analytics**: Data-driven insights for public health decision-making
 
-The system is designed to work seamlessly with a React frontend to provide a complete solution for tracking child immunizations in Kenya.
+The system is designed to be scalable, secure, and user-friendly, supporting Kenya's goal of improving child health outcomes through better immunization tracking.

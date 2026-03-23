@@ -1,3 +1,4 @@
+
 import {
   Controller,
   Get,
@@ -59,8 +60,15 @@ export class ChildrenController {
     @Body() createChildDto: CreateChildDto,
     @Request() req: any,
   ): Promise<ChildResponseDto> {
-    // parentId derived server-side in service from req.user.id
-    return this.childrenService.create(createChildDto, req.user.id);
+    try {
+      this.logger.log(`Creating child for user: ${req.user.id}`);
+      this.logger.log(`Request body: ${JSON.stringify(createChildDto)}`);
+      // parentId derived server-side in service from req.user.id
+      return await this.childrenService.create(createChildDto, req.user.id);
+    } catch (error) {
+      this.logger.error(`Error creating child: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Get()
