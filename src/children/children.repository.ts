@@ -21,6 +21,10 @@ async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Chi
       ...childData
     } = createChildDto;
 
+    // Convert string fields to numbers
+    const parsedBirthWeight = birthWeight ? parseFloat(birthWeight) : undefined;
+    const parsedBirthHeight = birthHeight ? parseFloat(birthHeight) : undefined;
+
     const data: Prisma.ChildCreateInput = {
       ...childData,
       dateOfBirth: new Date(childData.dateOfBirth),
@@ -32,8 +36,8 @@ async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Chi
           connect: { id: birthFacilityId },
         },
       }),
-      ...(birthWeight && { birthWeight }),
-      ...(birthHeight && { birthHeight }),
+      ...(parsedBirthWeight && { birthWeight: parsedBirthWeight }),
+      ...(parsedBirthHeight && { birthHeight: parsedBirthHeight }),
       ...(deliveryMethod && { deliveryMethod }),
       ...(gestationalAge && { gestationalAge }),
       ...(complications && { complications }),
@@ -357,9 +361,19 @@ async update(id: string, updateChildDto: UpdateChildDto & { parentId?: string })
     const {
       parentId,
       birthFacilityId,
+      birthWeight,
+      birthHeight,
+      deliveryMethod,
+      gestationalAge,
+      complications,
+      notes,
       dateOfBirth,
       ...childData
     } = updateChildDto;
+
+    // Convert string fields to numbers
+    const parsedBirthWeight = birthWeight ? parseFloat(birthWeight) : undefined;
+    const parsedBirthHeight = birthHeight ? parseFloat(birthHeight) : undefined;
 
     const data: Prisma.ChildUpdateInput = {
       ...childData,
@@ -374,6 +388,12 @@ async update(id: string, updateChildDto: UpdateChildDto & { parentId?: string })
           connect: { id: birthFacilityId },
         },
       }),
+      ...(parsedBirthWeight !== undefined && { birthWeight: parsedBirthWeight || null }),
+      ...(parsedBirthHeight !== undefined && { birthHeight: parsedBirthHeight || null }),
+      ...(deliveryMethod && { deliveryMethod }),
+      ...(gestationalAge && { gestationalAge }),
+      ...(complications && { complications }),
+      ...(notes && { notes }),
     };
 
     return this.prisma.child.update({
