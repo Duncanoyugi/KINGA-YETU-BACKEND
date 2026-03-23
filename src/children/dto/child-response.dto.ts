@@ -59,6 +59,28 @@ export class ChildResponseDto {
   })
   parentId: string;
 
+  // Birth information
+  @ApiProperty({ example: 'Kenyatta National Hospital', description: 'Birth facility name', required: false })
+  birthFacilityName?: string;
+
+  @ApiProperty({ example: 3.5, description: 'Birth weight in kg', required: false })
+  birthWeight?: number;
+
+  @ApiProperty({ example: 39.8, description: 'Birth height in cm', required: false })
+  birthHeight?: number;
+
+  @ApiProperty({ example: 'Normal vaginal delivery', description: 'Delivery method', required: false })
+  deliveryMethod?: string;
+
+  @ApiProperty({ example: 'Full term', description: 'Gestational age', required: false })
+  gestationalAge?: string;
+
+  @ApiProperty({ example: 'No complications', description: 'Birth complications', required: false })
+  complications?: string;
+
+  @ApiProperty({ example: 'Healthy baby', description: 'Additional notes', required: false })
+  notes?: string;
+
   @ApiProperty({
     example: {
       id: 'clm89djs400s0p29jf0t',

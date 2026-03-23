@@ -17,6 +17,7 @@ async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Chi
       deliveryMethod,
       gestationalAge,
       complications,
+      notes,
       ...childData
     } = createChildDto;
 
@@ -31,6 +32,12 @@ async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Chi
           connect: { id: birthFacilityId },
         },
       }),
+      ...(birthWeight && { birthWeight }),
+      ...(birthHeight && { birthHeight }),
+      ...(deliveryMethod && { deliveryMethod }),
+      ...(gestationalAge && { gestationalAge }),
+      ...(complications && { complications }),
+      ...(notes && { notes }),
     };
 
     return this.prisma.child.create({

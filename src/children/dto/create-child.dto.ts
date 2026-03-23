@@ -62,7 +62,7 @@ export class CreateChildDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^[A-Z0-9]{8,20}$/, {
+  @Matches(/^[A-Za-z0-9]{8,20}$/, {
     message: 'Birth certificate number must be 8-20 alphanumeric characters',
   })
   birthCertificateNo?: string;

@@ -39,6 +39,13 @@ export class ChildrenService {
       birthCertificateNo: child.birthCertificateNo || undefined,
       uniqueIdentifier: child.uniqueIdentifier,
       parentId: child.parentId,
+      birthFacilityName: child.birthFacility?.name || undefined,
+      birthWeight: child.birthWeight || undefined,
+      birthHeight: child.birthHeight || undefined,
+      deliveryMethod: child.deliveryMethod || undefined,
+      gestationalAge: child.gestationalAge || undefined,
+      complications: child.complications || undefined,
+      notes: child.notes || undefined,
       parent: {
         id: child.parent.user.id,
         fullName: child.parent.user.fullName,

@@ -1,10 +1,9 @@
 # =====================================================
 # ImmuniTrack Kenya - TESTED API Calls
-# =====================================================
-# All tested API endpoints with working credentials
+# Using Render Hosted Backend: https://kinga-yetu-backend.onrender.com
 # =====================================================
 
-@baseUrl = http://localhost:3000/api
+@baseUrl = https://kinga-yetu-backend.onrender.com/api
 @authUrl = {{baseUrl}}/auth
 
 # =====================================================

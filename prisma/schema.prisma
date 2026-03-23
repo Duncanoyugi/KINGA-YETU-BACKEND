@@ -163,6 +163,12 @@ model Child {
   birthCertificateNo String?               @unique
   uniqueIdentifier   String                @default(cuid())
   birthFacilityId    String?
+  birthWeight        Float?
+  birthHeight        Float?
+  deliveryMethod     String?
+  gestationalAge     String?
+  complications      String?
+  notes              String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   birthFacility      HealthFacility?       @relation(fields: [birthFacilityId], references: [id])
