@@ -131,16 +131,19 @@ export class ChildrenService {
       const dtoWithParent = { ...createChildDto, parentId };
       this.logger.log(`DTO with parent: ${JSON.stringify(dtoWithParent)}`);
 
-    // Check authorization for non-owner
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+      // Check authorization for non-owner
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true },
+      });
 
-    if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'HEALTH_WORKER' && userId !== parent.userId) {
-      throw new ForbiddenException('Unauthorized to register for this parent');
-    }
+      // For PARENT role, they can only register for themselves (userId === parent.userId)
+      // For ADMIN/HEALTH_WORKER/SUPER_ADMIN, they can register for any parent
+      if (user?.role === 'PARENT' && userId !== parent.userId) {
+        throw new ForbiddenException('Unauthorized to register a child for another parent');
+      }
 
-    // Check birth certificate
+      // Check birth certificate
     if (dtoWithParent.birthCertificateNo) {
       const existingChild = await this.childrenRepository.findByBirthCertificate(
         dtoWithParent.birthCertificateNo,

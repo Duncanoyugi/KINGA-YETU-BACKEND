@@ -581,9 +581,9 @@ export class AnalyticsService {
 
       const recentActivities = recentImmunizations.map((imm) => ({
         action: `Vaccination: ${imm.vaccine.name}`,
-        facility: imm.facility.name,
+        facility: imm.facility?.name || 'Unknown',
         time: this.getRelativeTime(imm.dateAdministered),
-        user: imm.healthWorker.user.fullName,
+        user: imm.healthWorker?.user?.fullName || 'Unknown',
         alert: false,
       }));
 

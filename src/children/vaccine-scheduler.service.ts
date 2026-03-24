@@ -60,7 +60,7 @@ export class VaccineSchedulerService {
     const child = await this.childrenService.create(createChildDto, userId);
     
     // Generate vaccination schedules
-    const schedules = await this.generateVaccinationSchedules(child.id, new Date(createChildDto.dateOfBirth));
+    const schedules = await this.generateVaccinationSchedules(child.id, child.parentId, new Date(createChildDto.dateOfBirth));
     
     return {
       child,
@@ -68,7 +68,7 @@ export class VaccineSchedulerService {
     };
   }
 
-  async generateVaccinationSchedules(childId: string, dateOfBirth: Date): Promise<any[]> {
+  async generateVaccinationSchedules(childId: string, parentId: string, dateOfBirth: Date): Promise<any[]> {
     const schedules: any[] = [];
     
     for (const vaccineSchedule of this.KEPI_SCHEDULE) {
@@ -100,6 +100,7 @@ export class VaccineSchedulerService {
       const schedule = await this.prisma.vaccinationSchedule.create({
         data: {
           childId,
+          parentId,
           vaccineId: vaccine.id,
           dueDate,
           status: 'SCHEDULED',

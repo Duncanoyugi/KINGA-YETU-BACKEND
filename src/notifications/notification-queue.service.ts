@@ -249,13 +249,17 @@ export class NotificationQueueService {
    * Determine which channels to use based on notification type and user preferences
    */
   private determineChannels(type: NotificationType, user: any): string[] {
-    const defaultChannels: Record<NotificationType, string[]> = {
-      [NotificationType.VACCINE_REMINDER]: ['sms', 'push'],
-      [NotificationType.APPOINTMENT_CONFIRMATION]: ['sms', 'email'],
-      [NotificationType.REPORT_READY]: ['email', 'push'],
-      [NotificationType.SYSTEM_ALERT]: ['push', 'email', 'sms'],
-      [NotificationType.SECURITY_ALERT]: ['push', 'sms'],
-      [NotificationType.PUSH_NOTIFICATION]: ['push'],
+    const defaultChannels: Record<string, string[]> = {
+      VACCINE_REMINDER: ['sms', 'push'],
+      APPOINTMENT_CONFIRMATION: ['sms', 'email'],
+      REPORT_READY: ['email', 'push'],
+      SYSTEM_ALERT: ['push', 'email', 'sms'],
+      SECURITY_ALERT: ['push', 'sms'],
+      PUSH_NOTIFICATION: ['push'],
+      UPDATE: ['push', 'email'],
+      REMINDER: ['sms', 'push'],
+      ALERT: ['push', 'email', 'sms'],
+      SYSTEM: ['push', 'email'],
     };
 
     const channels = defaultChannels[type] || ['push'];
@@ -279,13 +283,17 @@ export class NotificationQueueService {
    * Get email template name for notification type
    */
   private getEmailTemplateName(type: NotificationType): string {
-    const templateMap: Record<NotificationType, string> = {
-      [NotificationType.VACCINE_REMINDER]: 'reminder-email',
-      [NotificationType.APPOINTMENT_CONFIRMATION]: 'reminder-email',
-      [NotificationType.REPORT_READY]: 'report-ready',
-      [NotificationType.SYSTEM_ALERT]: 'system-alert',
-      [NotificationType.SECURITY_ALERT]: 'security-alert',
-      [NotificationType.PUSH_NOTIFICATION]: 'push-notification',
+    const templateMap: Record<string, string> = {
+      VACCINE_REMINDER: 'reminder-email',
+      APPOINTMENT_CONFIRMATION: 'reminder-email',
+      REPORT_READY: 'report-ready',
+      SYSTEM_ALERT: 'system-alert',
+      SECURITY_ALERT: 'security-alert',
+      PUSH_NOTIFICATION: 'push-notification',
+      UPDATE: 'system-alert',
+      REMINDER: 'reminder-email',
+      ALERT: 'system-alert',
+      SYSTEM: 'system-alert',
     };
 
     return templateMap[type] || 'default';
@@ -299,13 +307,17 @@ export class NotificationQueueService {
       return this.smsTemplateCache.get(type)!;
     }
 
-    const templateMap: Record<NotificationType, string> = {
-      [NotificationType.VACCINE_REMINDER]: 'reminder-sms',
-      [NotificationType.APPOINTMENT_CONFIRMATION]: 'reminder-sms',
-      [NotificationType.REPORT_READY]: 'report-sms',
-      [NotificationType.SYSTEM_ALERT]: 'alert-sms',
-      [NotificationType.SECURITY_ALERT]: 'alert-sms',
-      [NotificationType.PUSH_NOTIFICATION]: 'push-sms',
+    const templateMap: Record<string, string> = {
+      VACCINE_REMINDER: 'reminder-sms',
+      APPOINTMENT_CONFIRMATION: 'reminder-sms',
+      REPORT_READY: 'report-sms',
+      SYSTEM_ALERT: 'alert-sms',
+      SECURITY_ALERT: 'alert-sms',
+      PUSH_NOTIFICATION: 'push-sms',
+      UPDATE: 'alert-sms',
+      REMINDER: 'reminder-sms',
+      ALERT: 'alert-sms',
+      SYSTEM: 'alert-sms',
     };
 
     const templateName = templateMap[type] || 'default';

@@ -691,4 +691,135 @@ backend/
 
 ---
 
-*This documentation was created to help you understand the Kinga Yetu Digital backend system. If you have questions, refer to the code comments or ask the development team.*
+## 11. Testing the Backend (API Testing Guide)
+
+This section provides examples of how to test the backend API endpoints.
+
+### Base URL
+
+- **Local Development:** `http://localhost:5000/api`
+- **Production/Deployed:** `https://kinga-yetu-backend.onrender.com/api`
+
+### Authentication Flow
+
+All protected endpoints require a valid JWT token in the Authorization header:
+
+```
+Authorization: Bearer <token>
+```
+
+### Test Scenarios
+
+#### 1. Login as PARENT
+
+```
+POST {{authUrl}}/login
+Content-Type: application/json
+
+{
+  "email": "vivian@gmail.com",
+  "password": "Vivian@1234"
+}
+```
+
+**Expected Response:**
+```json
+{
+  "user": {
+    "id": "...",
+    "email": "vivian@gmail.com",
+    "role": "PARENT",
+    "parentProfile": {
+      "id": "...",
+      "userId": "..."
+    }
+  },
+  "accessToken": "eyJhbGci..."
+}
+```
+
+#### 2. Get Current User Profile
+
+```
+GET {{authUrl}}/me
+Authorization: Bearer <token>
+```
+
+#### 3. Get List of Vaccines (Public)
+
+```
+GET /api/vaccines
+Authorization: Bearer <token>
+```
+
+
+#### 4. Get List of Health Facilities
+
+
+```
+GET /api/facilities
+Authorization: Bearer <token>
+```
+
+#### 5. Register a Child (PARENT role)
+
+```
+POST /api/children
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "firstName": "ChildFirstName",
+  "lastName": "ChildLastName",
+  "dateOfBirth": "2025-03-01",
+  "gender": "MALE"
+}
+```
+
+**Note:** Creating a child will automatically generate a vaccination schedule based on KEPI (Kenya Expanded Programme on Immunization).
+
+#### 6. Get Upcoming Vaccines (HEALTH_WORKER, ADMIN, SUPER_ADMIN only)
+
+```
+GET /api/schedules/upcoming
+Authorization: Bearer <token>
+```
+
+### Role-Based Access Control
+
+The system implements strict role-based access control:
+
+| Endpoint | PARENT | HEALTH_WORKER | ADMIN | SUPER_ADMIN |
+|----------|--------|----------------|------|-------------|
+| POST /api/children | ✓ | ✓ | ✓ | ✓ |
+| GET /api/children | ✓ | ✓ | ✓ | ✓ |
+| GET /api/schedules/upcoming | ✗ | ✓ | ✓ | ✓ |
+| GET /api/parents/dashboard | ✗ | ✓ | ✓ | ✓ |
+| POST /api/reports/* | ✗ | ✗ | ✓ | ✓ |
+| GET /api/analytics/* | ✗ | ✗ | ✓ | ✓ |
+
+### Known Issues / Troubleshooting
+
+1. **Database Migration Issues:** If you encounter "Column does not exist" errors, ensure all Prisma migrations have been applied to the database. Run:
+   ```
+   npx prisma migrate deploy
+   ```
+
+2. **Authentication Errors:** Make sure to include the JWT token in all protected requests.
+
+3. **Role Errors:** Some endpoints are restricted to certain roles. If you get a 403 Forbidden error, your role doesn't have permission to access that endpoint.
+
+4. **Child Registration 500 Error:** If POST /api/children returns 500 Internal Server Error, this indicates a database schema mismatch. The deployed database is missing columns that exist in the Prisma schema (e.g., `birthWeight`, `birthHeight` in the children table). To fix this, manually run SQL to add the missing columns:
+   ```sql
+   ALTER TABLE children ADD COLUMN birthWeight DOUBLE PRECISION;
+   ALTER TABLE children ADD COLUMN birthHeight DOUBLE PRECISION;
+   ALTER TABLE children ADD COLUMN deliveryMethod TEXT;
+   ALTER TABLE children ADD COLUMN gestationalAge TEXT;
+   ALTER TABLE children ADD COLUMN complications TEXT;
+   ALTER TABLE children ADD COLUMN notes TEXT;
+   ```
+   Then restart the server to clear any cached schema.
+
+---
+
+*This testing guide helps you understand how to interact with the Kinga Yetu Digital backend API.*

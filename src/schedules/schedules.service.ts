@@ -9,7 +9,7 @@ import { ScheduleCalculatorService } from './schedule-calculator.service';
 import { ScheduleResponseDto, PaginatedSchedulesResponseDto, ScheduleStatsDto } from './dto/schedule-response.dto';
 import { UpcomingVaccinesResponseDto, FacilityUpcomingVaccinesDto } from './dto/upcoming-vaccines.dto';
 import { GenerateScheduleDto, RegenerateScheduleDto } from './dto/generate-schedule.dto';
-import { ImmunizationStatus } from '@prisma/client';
+import { ImmunizationStatus, ReminderType } from '@prisma/client';
 
 @Injectable()
 export class SchedulesService {
@@ -220,7 +220,7 @@ export class SchedulesService {
               childId,
               parentId: schedule.child.parentId,
               vaccineId: schedule.vaccineId,
-              type: 'EMAIL',
+              type: ReminderType.VACCINE_DUE,
               message: `Reminder: ${schedule.child.firstName} is due for ${schedule.vaccine.name} in 7 days`,
               scheduledFor: reminder7Days,
               status: 'PENDING',

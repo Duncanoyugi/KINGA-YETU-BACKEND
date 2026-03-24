@@ -27,7 +27,7 @@ Content-Type: application/json
 
 ### 1.2 Register Child as PARENT (SUCCESS)
 # Requires JWT token
-@parentToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW11bWNvN20wMDAwMXFmMWdrdTIzNmtsIiwiZW1haWwiOiJ2aXZpYW5AZ21haWwuY29tIiwicm9sZSI6IlBBUkVOVCIsImlhdCI6MTc3NDI1ODk2NSwiZXhwIjoxNzc0MjU5ODY1fQ.9D6LI8jdNOd-O_Cv536g_m3b9ebpQp696U8VttOTDXM
+@parentToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbW11bWNvN20wMDAwMXFmMWdrdTIzNmtsIiwiZW1haWwiOiJ2aXZpYW5AZ21haWwuY29tIiwicm9sZSI6IlBBUkVOVCIsImlhdCI6MTc3NDM0MDc5MiwiZXhwIjoxNzc0MzQxNjkyfQ.JiPSTzbQd3pdmilZzabxTxi00DFyf3fBxYIhdS1_smc
 
 POST {{baseUrl}}/children
 Content-Type: application/json

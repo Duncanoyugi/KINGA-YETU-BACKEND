@@ -181,10 +181,6 @@ export class ImmunizationsService {
           ? new Date(recordImmunizationDto.dateAdministered)
           : new Date(),
         status: recordImmunizationDto.status || ImmunizationStatus.ADMINISTERED,
-        expirationDate: recordImmunizationDto.expirationDate 
-          ? new Date(recordImmunizationDto.expirationDate)
-          : undefined,
-        administeredBy: recordImmunizationDto.administeredBy || healthWorker.user.fullName,
       },
       include: {
         child: {
@@ -251,7 +247,7 @@ export class ImmunizationsService {
         status: 'SCHEDULED',
       },
       data: {
-        status,
+        status: status === ImmunizationStatus.ADMINISTERED ? 'COMPLETED' : status === ImmunizationStatus.MISSED ? 'MISSED' : status as any,
       },
     });
   }
@@ -527,7 +523,7 @@ export class ImmunizationsService {
 
       const isAuthorized = user?.role === 'ADMIN' || 
                           user?.role === 'SUPER_ADMIN' ||
-                          user?.id === existingImmunization.healthWorker.userId;
+                          user?.id === existingImmunization.healthWorker?.userId;
 
       if (!isAuthorized) {
         throw new ForbiddenException('You are not authorized to update this immunization record');
@@ -547,9 +543,6 @@ export class ImmunizationsService {
       where: { id },
       data: {
         ...updateImmunizationDto,
-        expirationDate: updateImmunizationDto.expirationDate
-          ? new Date(updateImmunizationDto.expirationDate)
-          : undefined,
       },
       include: {
         child: {
@@ -827,8 +820,8 @@ export class ImmunizationsService {
       vaccineName: immunization.vaccine.name,
       vaccineCode: immunization.vaccine.code,
       dateAdministered: immunization.dateAdministered,
-      facilityName: immunization.facility.name,
-      healthWorkerName: immunization.healthWorker.user.fullName,
+      facilityName: immunization.facility?.name || 'Unknown',
+      healthWorkerName: immunization.healthWorker?.user?.fullName || 'Unknown',
       batchNumber: immunization.batchNumber,
       status: immunization.status,
     }));

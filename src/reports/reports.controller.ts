@@ -261,7 +261,7 @@ export class ReportsController {
           parameters: ['startDate', 'endDate', 'county', 'subCounty', 'facilityId'],
         },
         {
-          type: 'FACILITY_PERFORMANCE',
+          type: 'FACILITY',
           name: 'Facility Performance Report',
           description: 'Performance metrics for health facilities',
           parameters: ['startDate', 'endDate', 'county', 'subCounty', 'facilityIds'],
@@ -309,7 +309,7 @@ export class ReportsController {
         {
           id: 'facility-monthly',
           name: 'Monthly Facility Performance',
-          type: 'FACILITY_PERFORMANCE',
+          type: 'FACILITY',
           description: 'Monthly performance report for facilities',
           parameters: {
             startDate: '2024-01-01',

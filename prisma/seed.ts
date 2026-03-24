@@ -1,20 +1,9 @@
-import { PrismaClient, ReportType, ReportFormat, ReportFrequency } from '@prisma/client';
+import { PrismaClient, ReportType } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.report.create({
-    data: {
-      title: 'Immunization Coverage Report',
-      type: ReportType.COVERAGE,
-      description: 'Seeded coverage report for dashboard',
-      parameters: '{}',
-      data: '{}',
-      format: ReportFormat.PDF,
-      frequency: ReportFrequency.ON_DEMAND,
-      isPublic: true,
-      generatedById: 'cmm1zaqyu000kekb9em3p072m', // Admin user ID
-    },
-  });
+  // Note: Reports now require userId - skipping seed for now
+  console.log('Seeding completed (reports skipped - require valid userId)');
 }
 
 main()

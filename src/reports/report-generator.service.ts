@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { DataMiningService } from '../analytics/data-mining.service';
@@ -191,6 +192,7 @@ export class ReportGeneratorService {
           description: `Coverage report for ${reportData.period}`,
           parameters: JSON.stringify(request),
           data: JSON.stringify(reportData),
+          userId: userId,
           generatedById: userId,
         },
       });
@@ -518,6 +520,7 @@ export class ReportGeneratorService {
             byFacility,
             byVaccine,
           }),
+          userId: userId,
           generatedById: userId,
         },
       });
@@ -636,6 +639,7 @@ export class ReportGeneratorService {
           description: `Custom ${reportType.toLowerCase()} report`,
           parameters: JSON.stringify(parameters),
           data: JSON.stringify(reportData),
+          userId: userId,
           generatedById: userId,
         },
       });
@@ -764,11 +768,12 @@ export class ReportGeneratorService {
     // Save file reference to database
     await this.prisma.report.create({
       data: {
-        title: `${data.facilityName} Performance Report`,
+        title: `${data.facilityName} Facility Report`,
         type: ReportType.FACILITY_PERFORMANCE,
         description: `Performance report for ${data.facilityName}`,
         parameters: JSON.stringify({ facilityId: data.facilityId }),
         data: JSON.stringify(data),
+        userId: userId,
         generatedById: userId,
       },
     });

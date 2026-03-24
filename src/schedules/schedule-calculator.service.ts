@@ -131,9 +131,10 @@ export class ScheduleCalculatorService {
           await this.prisma.vaccinationSchedule.create({
             data: {
               childId,
+              parentId: child.parentId,
               vaccineId: vaccine.id,
               dueDate,
-              status,
+              status: 'SCHEDULED',
             },
           });
           created++;
@@ -243,9 +244,10 @@ export class ScheduleCalculatorService {
           await this.prisma.vaccinationSchedule.create({
             data: {
               childId,
+              parentId: child.parentId,
               vaccineId: vaccine.id,
               dueDate,
-              status: ImmunizationStatus.SCHEDULED,
+              status: 'SCHEDULED',
             },
           });
           created++;
@@ -475,7 +477,7 @@ export class ScheduleCalculatorService {
       const schedule = schedules.find(s => s.vaccineId === immunization.vaccineId);
       if (schedule) {
         const recommendedDate = new Date(child.dateOfBirth);
-        recommendedDate.setDate(recommendedDate.getDate() + immunization.ageAtDays);
+        recommendedDate.setDate(recommendedDate.getDate() + (immunization.ageAtDays || 0));
         
         const daysDiff = Math.abs(
           (immunization.dateAdministered.getTime() - recommendedDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -746,8 +748,8 @@ export class ScheduleCalculatorService {
         vaccineCode: imm.vaccine.code,
         vaccineName: imm.vaccine.name,
         dateAdministered: imm.dateAdministered,
-        facility: imm.facility.name,
-        healthWorker: imm.healthWorker.user.fullName,
+        facility: imm.facility?.name || 'Unknown',
+        healthWorker: imm.healthWorker?.user?.fullName || 'Unknown',
         batchNumber: imm.batchNumber,
         ageAtDays: imm.ageAtDays,
       })),

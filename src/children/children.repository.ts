@@ -236,27 +236,9 @@ async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Chi
         },
         growthRecords: {
           orderBy: { measurementDate: 'desc' },
-          include: {
-            recordedBy: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
-            },
-          },
         },
         developmentRecords: {
           orderBy: { assessmentDate: 'desc' },
-          include: {
-            recordedBy: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
-            },
-          },
         },
         reminders: {
           take: 10,

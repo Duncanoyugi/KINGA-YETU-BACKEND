@@ -2,6 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsEnum, IsOptional, IsString, IsObject, IsArray, IsBoolean } from 'class-validator';
 import { ReportType, ReportFormat, ReportFrequency } from '@prisma/client';
 
+// Re-export for use in other files
+export { ReportFormat, ReportFrequency };
+
 export class CreateReportDto {
   @ApiProperty()
   @IsNotEmpty()

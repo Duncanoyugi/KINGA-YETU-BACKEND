@@ -6,6 +6,125 @@ datasource db {
   provider = "postgresql"
 }
 
+// Enums
+enum UserRole {
+  PARENT
+  HEALTH_WORKER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OtpType {
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+  REGISTRATION
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum HealthFacilityType {
+  HOSPITAL
+  HEALTH_CENTER
+  CLINIC
+  DISPENSARY
+  Maternity
+}
+
+enum ImmunizationStatus {
+  SCHEDULED
+  ADMINISTERED
+  MISSED
+  DEFERRED
+  CONTRAINDICATED
+}
+
+enum ScheduleStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CONTRAINDICATED
+  CANCELLED
+}
+
+enum ReminderType {
+  VACCINE_DUE
+  VACCINE_OVERDUE
+  APPOINTMENT
+  GENERAL
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum NotificationType {
+  REMINDER
+  ALERT
+  UPDATE
+  SYSTEM
+  VACCINE_REMINDER
+  APPOINTMENT_CONFIRMATION
+  REPORT_READY
+  SYSTEM_ALERT
+  SECURITY_ALERT
+  PUSH_NOTIFICATION
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+}
+
+enum ReportType {
+  COVERAGE
+  IMMUNIZATION
+  MISSED_VACCINES
+  FACILITY_PERFORMANCE
+  FACILITY
+  CUSTOM
+  DEMOGRAPHIC
+  TIMELINESS
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+  HTML
+}
+
+enum ReportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ON_DEMAND
+}
+
+// Models
 model User {
   id                 String              @id @default(cuid())
   email              String              @unique
@@ -21,17 +140,15 @@ model User {
   updatedAt          DateTime            @updatedAt
   adminProfile       AdminProfile?
   auditLogs          AuditLog[]
-  developmentRecords DevelopmentRecord[]
-  growthRecords      GrowthRecord[]
   healthWorker       HealthWorker?
   notifications      Notification[]
   parentProfile      Parent?
-  reports            Report[]
+  reports            Report[]            @relation("ReportUser")
+  generatedReports   Report[]            @relation("ReportGeneratedBy")
   sessions           Session[]
   profile            UserProfile?
 
   @@index([email])
-  @@index([role])
   @@index([createdAt])
   @@map("users")
 }
@@ -48,8 +165,6 @@ model Otp {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([email, type, isUsed])
-  @@index([phone, type, isUsed])
   @@index([expiresAt])
   @@map("otps")
 }
@@ -69,7 +184,6 @@ model UserProfile {
   updatedAt      DateTime  @updatedAt
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([county, subCounty])
   @@map("user_profiles")
 }
 
@@ -96,6 +210,7 @@ model Parent {
   children         Child[]
   user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   reminders        Reminder[]
+  schedules        VaccinationSchedule[]
 
   @@map("parents")
 }
@@ -148,7 +263,6 @@ model HealthFacility {
   immunizations Immunization[]
 
   @@index([county, subCounty])
-  @@index([mflCode])
   @@map("health_facilities")
 }
 
@@ -218,133 +332,71 @@ model Vaccine {
 }
 
 model Immunization {
-  id               String             @id @default(cuid())
+  id               String            @id @default(cuid())
   childId          String
   vaccineId        String
-  facilityId       String
-  healthWorkerId   String
-  administeredBy   String?
-  dateAdministered DateTime           @default(now())
-  ageAtDays        Int
-  status           ImmunizationStatus @default(ADMINISTERED)
+  healthWorkerId   String?
+  facilityId       String?
+  ageAtDays        Int?
+  dateAdministered DateTime          @default(now())
+  status           ImmunizationStatus @default(SCHEDULED)
   batchNumber      String?
-  expirationDate   DateTime?
   notes            String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  child            Child              @relation(fields: [childId], references: [id], onDelete: Cascade)
-  facility         HealthFacility     @relation(fields: [facilityId], references: [id])
-  healthWorker     HealthWorker       @relation(fields: [healthWorkerId], references: [id])
-  vaccine          Vaccine            @relation(fields: [vaccineId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  child            Child             @relation(fields: [childId], references: [id], onDelete: Cascade)
+  vaccine          Vaccine           @relation(fields: [vaccineId], references: [id])
+  healthWorker     HealthWorker?     @relation(fields: [healthWorkerId], references: [id])
+  facility         HealthFacility?   @relation(fields: [facilityId], references: [id])
 
-  @@unique([childId, vaccineId])
   @@index([childId])
   @@index([vaccineId])
   @@index([dateAdministered])
-  @@index([status])
   @@map("immunizations")
 }
 
 model VaccinationSchedule {
-  id        String             @id @default(cuid())
+  id        String        @id @default(cuid())
   childId   String
+  parentId  String
   vaccineId String
   dueDate   DateTime
-  status    ImmunizationStatus @default(SCHEDULED)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  child     Child              @relation(fields: [childId], references: [id], onDelete: Cascade)
-  vaccine   Vaccine            @relation(fields: [vaccineId], references: [id])
+  status    ScheduleStatus @default(PENDING)
+  notes     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  child     Child          @relation(fields: [childId], references: [id], onDelete: Cascade)
+  vaccine   Vaccine        @relation(fields: [vaccineId], references: [id])
+  parent    Parent         @relation(fields: [parentId], references: [id], onDelete: Cascade)
 
-  @@unique([childId, vaccineId])
   @@index([childId])
   @@index([dueDate])
-  @@index([status])
   @@map("vaccination_schedules")
 }
 
 model Reminder {
-  id           String         @id @default(cuid())
-  childId      String
-  parentId     String
-  vaccineId    String
+  id           String        @id @default(cuid())
+  childId      String?
+  parentId     String?
+  vaccineId    String?
   type         ReminderType
   message      String
   scheduledFor DateTime
   status       ReminderStatus @default(PENDING)
-  metadata     String?        @default("{}")
-  retryCount   Int            @default(0)
+  metadata     String?       @default("{}")
+  retryCount   Int           @default(0)
   batchNumber  String?
   errorMessage String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  child        Child          @relation(fields: [childId], references: [id], onDelete: Cascade)
-  parent       Parent         @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  vaccine      Vaccine        @relation(fields: [vaccineId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  child        Child?        @relation(fields: [childId], references: [id], onDelete: Cascade)
+  parent       Parent?       @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  vaccine      Vaccine?      @relation(fields: [vaccineId], references: [id])
 
   @@index([childId])
   @@index([parentId])
   @@index([scheduledFor])
-  @@index([status])
-  @@index([retryCount])
   @@map("reminders")
-}
-
-model GrowthRecord {
-  id              String   @id @default(cuid())
-  childId         String
-  measurementDate DateTime @default(now())
-  weight          Float
-  height          Float?
-  recordedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-  recordedBy      User     @relation(fields: [recordedById], references: [id])
-
-  @@index([childId])
-  @@index([measurementDate])
-  @@map("growth_records")
-}
-
-model DevelopmentRecord {
-  id             String   @id @default(cuid())
-  childId        String
-  assessmentDate DateTime @default(now())
-  motorSkills    String?
-  languageSkills String?
-  socialSkills   String?
-  recordedById   String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  child          Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-  recordedBy     User     @relation(fields: [recordedById], references: [id])
-
-  @@index([childId])
-  @@index([assessmentDate])
-  @@map("development_records")
-}
-
-model Report {
-  id            String     @id @default(cuid())
-  title         String
-  type          ReportType
-  description   String?
-  parameters    String     @default("{}")
-  data          String     @default("{}")
-  format        ReportFormat @default(PDF)
-  frequency     ReportFrequency @default(ON_DEMAND)
-  isPublic      Boolean    @default(false)
-  scheduledFor  DateTime?
-  generatedById String
-  generatedAt   DateTime   @default(now())
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  generatedBy   User       @relation(fields: [generatedById], references: [id])
-
-  @@index([type])
-  @@index([generatedAt])
-  @@map("reports")
 }
 
 model Notification {
@@ -362,8 +414,42 @@ model Notification {
 
   @@index([userId])
   @@index([isRead])
-  @@index([type])
+  @@index([sentAt])
   @@map("notifications")
+}
+
+model GrowthRecord {
+  id              String   @id @default(cuid())
+  childId         String
+  measurementDate DateTime @default(now())
+  weight          Float
+  height          Float?
+  headCircumference Float?
+  muac            Float?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([measurementDate])
+  @@map("growth_records")
+}
+
+model DevelopmentRecord {
+  id                String   @id @default(cuid())
+  childId           String
+  assessmentDate    DateTime @default(now())
+  milestoneType     String
+  status            String
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  child             Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([assessmentDate])
+  @@map("development_records")
 }
 
 model AuditLog {
@@ -377,118 +463,31 @@ model AuditLog {
   createdAt  DateTime    @default(now())
   user       User?       @relation(fields: [userId], references: [id])
 
-  @@index([userId])
-  @@index([action])
-  @@index([entityType])
   @@index([createdAt])
+  @@index([entityType])
+  @@index([userId])
   @@map("audit_logs")
 }
 
-model SystemSetting {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     String
-  category  String
-  isPublic  Boolean  @default(false)
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+model Report {
+  id          String       @id @default(cuid())
+  userId      String
+  type        ReportType
+  title       String
+  description String?
+  status      ReportStatus @default(PENDING)
+  fileUrl     String?
+  metadata    String?     @default("{}")
+  parameters  String?     @default("{}")
+  data        String?     @default("{}")
+  isPublic    Boolean     @default(false)
+  generatedAt DateTime?   @default(now())
+  generatedById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  user        User         @relation("ReportUser", fields: [userId], references: [id], onDelete: Cascade)
+  generatedBy User?        @relation("ReportGeneratedBy", fields: [generatedById], references: [id])
 
-  @@index([key])
-  @@index([category])
-  @@map("system_settings")
-}
-
-enum UserRole {
-  PARENT
-  HEALTH_WORKER
-  ADMIN
-  SUPER_ADMIN
-}
-
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
-}
-
-enum OtpType {
-  REGISTRATION
-  PASSWORD_RESET
-  EMAIL_VERIFICATION
-  PHONE_VERIFICATION
-  TWO_FACTOR
-}
-
-enum ImmunizationStatus {
-  SCHEDULED
-  PENDING
-  ADMINISTERED
-  MISSED
-  CONTRAINDICATED
-}
-
-enum ReminderType {
-  EMAIL
-  SMS
-  PUSH
-}
-
-enum ReminderStatus {
-  PENDING
-  SENT
-  FAILED
-  CANCELLED
-}
-
-enum ReportType {
-  COVERAGE
-  MISSED_VACCINES
-  FACILITY_PERFORMANCE
-  DEMOGRAPHIC
-  TIMELINESS
-  CUSTOM
-}
-
-enum NotificationType {
-  VACCINE_REMINDER
-  APPOINTMENT_CONFIRMATION
-  REPORT_READY
-  PUSH_NOTIFICATION
-  SYSTEM_ALERT
-  SECURITY_ALERT
-}
-
-enum ReportFormat {
-  PDF
-  CSV
-  EXCEL
-  JSON
-  HTML
-}
-
-enum ReportFrequency {
-  ON_DEMAND
-  DAILY
-  WEEKLY
-  MONTHLY
-  YEARLY
-}
-
-enum AuditAction {
-  CREATE
-  UPDATE
-  DELETE
-  LOGIN
-  LOGOUT
-  EXPORT
-  IMPORT
-}
-
-enum HealthFacilityType {
-  HOSPITAL
-  HEALTH_CENTER
-  DISPENSARY
-  CLINIC
-  MOBILE_CLINIC
-  PRIVATE_PRACTICE
+  @@index([userId])
+  @@map("reports")
 }

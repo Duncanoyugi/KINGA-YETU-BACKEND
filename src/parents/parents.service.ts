@@ -589,7 +589,7 @@ export class ParentsService {
       })),
       upcomingReminders: upcomingReminders.map(reminder => ({
         id: reminder.id,
-        childName: `${reminder.child.firstName} ${reminder.child.lastName}`,
+        childName: reminder.child ? `${reminder.child.firstName} ${reminder.child.lastName}` : 'Unknown',
         vaccineName: reminder.vaccine?.name,
         scheduledFor: reminder.scheduledFor,
         status: reminder.status,

@@ -5,7 +5,7 @@ import { CreateReportDto, UpdateReportDto, ScheduleReportDto } from './dto/repor
 import { CoverageReportRequestDto } from './dto/coverage-report.dto';
 import { FacilityStatsRequestDto } from './dto/facility-stats.dto';
 import { MissedVaccinesRequestDto } from './dto/missed-vaccines.dto';
-import { Report, ReportType, ReportFormat } from '@prisma/client';
+import { Report, ReportType, ReportFormat, ReportFrequency } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -42,6 +42,7 @@ export class ReportsService {
           description: createReportDto.description || '',
           parameters: createReportDto.parameters ? JSON.stringify(createReportDto.parameters) : '{}',
           data: '{}',
+          userId: userId,
           generatedById: userId,
         },
       });
@@ -50,7 +51,7 @@ export class ReportsService {
       if (createReportDto.scheduledFor) {
         await this.scheduleReport({
           reportId: report.id,
-          frequency: createReportDto.frequency || 'ON_DEMAND',
+          frequency: createReportDto.frequency ?? ReportFrequency.ON_DEMAND,
           scheduleTime: createReportDto.scheduledFor,
           recipients: [],
           enabled: true,
@@ -331,6 +332,14 @@ export class ReportsService {
     // Get user names for byUser breakdown
     const userDetails = await Promise.all(
       byUser.map(async (item) => {
+        if (!item.generatedById) {
+          return {
+            userId: 'unknown',
+            userName: 'Unknown',
+            email: undefined,
+            count: item._count,
+          };
+        }
         const user = await this.prisma.user.findUnique({
           where: { id: item.generatedById },
           select: { fullName: true, email: true },
@@ -484,7 +493,7 @@ export class ReportsService {
       await this.reportGenerator.generateCustomReport(
         report.type,
         parameters,
-        report.generatedById,
+        report.generatedById || report.userId,
         ReportFormat.PDF,
       );
     } catch (error) {
