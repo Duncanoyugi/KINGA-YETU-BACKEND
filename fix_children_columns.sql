@@ -1,0 +1,7 @@
+-- Add birth fields to children table
+ALTER TABLE children ADD COLUMN IF NOT EXISTS birthWeight DOUBLE PRECISION;
+ALTER TABLE children ADD COLUMN IF NOT EXISTS birthHeight DOUBLE PRECISION;
+ALTER TABLE children ADD COLUMN IF NOT EXISTS deliveryMethod TEXT;
+ALTER TABLE children ADD COLUMN IF NOT EXISTS gestationalAge TEXT;
+ALTER TABLE children ADD COLUMN IF NOT EXISTS complications TEXT;
+ALTER TABLE children ADD COLUMN IF NOT EXISTS notes TEXT;
