@@ -138,6 +138,14 @@ model User {
   lastLoginAt        DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  
+  // Notification preferences
+  emailNotifications Boolean             @default(true)
+  smsNotifications   Boolean             @default(true)
+  pushNotifications  Boolean             @default(true)
+  quietHoursStart    String?             @default("22:00")
+  quietHoursEnd      String?             @default("07:00")
+  reminderDays       Int[]               @default([7, 3, 1])
   adminProfile       AdminProfile?
   auditLogs          AuditLog[]
   healthWorker       HealthWorker?

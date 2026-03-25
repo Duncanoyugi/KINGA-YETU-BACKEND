@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NotificationQueueService, NotificationOptions } from './notification-queue.service';
 import { SmsProvider, SmsOptions } from './providers/sms.provider';
 import { EmailProvider, EmailOptions } from './providers/email.provider';
 import { PushProvider, PushNotificationOptions } from './providers/push.provider';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class NotificationsService {
@@ -253,6 +253,96 @@ export class NotificationsService {
     } catch (error) {
       this.logger.error(`Test notification failed for ${channel}: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Get notification preferences for a user
+   */
+  async getNotificationPreferences(userId: string) {
+    const prisma = new PrismaClient();
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          emailNotifications: true,
+          smsNotifications: true,
+          pushNotifications: true,
+          quietHoursStart: true,
+          quietHoursEnd: true,
+          reminderDays: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+
+      return {
+        emailNotifications: user.emailNotifications ?? true,
+        smsNotifications: user.smsNotifications ?? true,
+        pushNotifications: user.pushNotifications ?? true,
+        quietHoursStart: user.quietHoursStart ?? '22:00',
+        quietHoursEnd: user.quietHoursEnd ?? '07:00',
+        reminderDays: user.reminderDays ?? [7, 3, 1],
+      };
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  /**
+   * Update notification preferences for a user
+   */
+  async updateNotificationPreferences(
+    userId: string,
+    updateData: {
+      emailNotifications?: boolean;
+      smsNotifications?: boolean;
+      pushNotifications?: boolean;
+      quietHoursStart?: string;
+      quietHoursEnd?: string;
+      reminderDays?: number[];
+    },
+  ) {
+    const prisma = new PrismaClient();
+    try {
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(updateData.emailNotifications !== undefined && { emailNotifications: updateData.emailNotifications }),
+          ...(updateData.smsNotifications !== undefined && { smsNotifications: updateData.smsNotifications }),
+          ...(updateData.pushNotifications !== undefined && { pushNotifications: updateData.pushNotifications }),
+          ...(updateData.quietHoursStart !== undefined && { quietHoursStart: updateData.quietHoursStart }),
+          ...(updateData.quietHoursEnd !== undefined && { quietHoursEnd: updateData.quietHoursEnd }),
+          ...(updateData.reminderDays !== undefined && { reminderDays: updateData.reminderDays }),
+        },
+        select: {
+          id: true,
+          emailNotifications: true,
+          smsNotifications: true,
+          pushNotifications: true,
+          quietHoursStart: true,
+          quietHoursEnd: true,
+          reminderDays: true,
+        },
+      });
+
+      this.logger.log(`Updated notification preferences for user ${userId}`);
+
+      return {
+        emailNotifications: user.emailNotifications,
+        smsNotifications: user.smsNotifications,
+        pushNotifications: user.pushNotifications,
+        quietHoursStart: user.quietHoursStart,
+        quietHoursEnd: user.quietHoursEnd,
+        reminderDays: user.reminderDays,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to update notification preferences: ${error.message}`);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
     }
   }
 }

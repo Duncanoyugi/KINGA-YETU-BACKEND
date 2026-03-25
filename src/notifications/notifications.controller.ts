@@ -4,6 +4,7 @@ import {
   Patch,
   Delete,
   Post,
+  Put,
   Body,
   Param,
   Query,
@@ -96,5 +97,33 @@ export class NotificationsController {
     await prisma.notification.delete({ where: { id: notificationId } });
     await prisma.$disconnect();
     return { success: true };
+  }
+
+  @Get('preferences/:userId')
+  @Roles(UserRole.PARENT, UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get user notification preferences' })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User notification preferences retrieved' })
+  async getPreferences(@Param('userId') userId: string) {
+    return this.notificationsService.getNotificationPreferences(userId);
+  }
+
+  @Put('preferences/:userId')
+  @Roles(UserRole.PARENT, UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update user notification preferences' })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User notification preferences updated' })
+  async updatePreferences(
+    @Param('userId') userId: string,
+    @Body() updateData: {
+      emailNotifications?: boolean;
+      smsNotifications?: boolean;
+      pushNotifications?: boolean;
+      quietHoursStart?: string;
+      quietHoursEnd?: string;
+      reminderDays?: number[];
+    },
+  ) {
+    return this.notificationsService.updateNotificationPreferences(userId, updateData);
   }
 }

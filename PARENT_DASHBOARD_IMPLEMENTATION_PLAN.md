@@ -6,8 +6,8 @@ A step-by-step plan to integrate all available backend features into the Parent 
 
 ## Phase 1: Quick Fixes (1-2 hours each)
 
-### Task 1.1: Fix Notification Preferences UI
-**Difficulty:** ⭐ Easy | **Backend Ready:** ✅ Yes
+### ✅ Task 1.1: Fix Notification Preferences UI
+**Difficulty:** ⭐ Easy | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - Page exists at `/notifications/reminder-settings`
@@ -24,23 +24,24 @@ A step-by-step plan to integrate all available backend features into the Parent 
 
 ---
 
-### Task 1.2: Display Actual Vaccine Names in Appointments
-**Difficulty:** ⭐ Easy | **Backend Ready:** ✅ Yes
+### ✅ Task 1.2: Display Actual Vaccine Names in Appointments
+**Difficulty:** ⭐ Easy | **Backend Ready:** ✅ Yes | **Status:** ✅ DONE
 
 **What's Broken:**
 - Appointments page shows `reminder.vaccineId` (just an ID, not readable)
 
-**Steps:**
-1. Update `frontend/src/pages/appointments/Appointments.tsx`
-2. Use the vaccine data from reminders or switch to `/api/schedules/child/:childId`
+**Solution Applied:**
+1. Changed from `useChildren` hook to `useGetChildrenByParentQuery()` 
+2. This calls `/api/children/my-children` which includes schedules with vaccine names
+3. Updated to show both upcoming appointments and vaccination history
 
-**Files to Modify:**
+**Files Modified:**
 - `frontend/src/pages/appointments/Appointments.tsx`
 
 ---
 
-### Task 1.3: Static Health Facility in Emergency Contacts
-**Difficulty:** ⭐ Easy | **Backend Ready:** ✅ Yes
+### ✅ Task 1.3: Static Health Facility in Emergency Contacts
+**Difficulty:** ⭐ Easy | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - Dashboard shows static "Health Facility" instead of actual facility data
@@ -58,7 +59,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ## Phase 2: Medium Complexity (2-4 hours each)
 
 ### Task 2.1: Child-Specific Statistics
-**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes
+**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - Dashboard shows same stats for ALL children
@@ -80,7 +81,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ---
 
 ### Task 2.2: Use Schedules Instead of Reminders for Upcoming
-**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes
+**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - Dashboard shows reminders as "upcoming appointments"
@@ -103,7 +104,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ---
 
 ### Task 2.3: Immunization History Display
-**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes
+**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - "Vaccinations" page exists but doesn't show detailed history
@@ -123,7 +124,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ---
 
 ### Task 2.4: Show Actual Overdue Vaccines
-**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes
+**Difficulty:** ⭐⭐ Medium | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - Missed Vaccinations count is wrong
@@ -145,7 +146,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ## Phase 3: Complex Features (4-8 hours each)
 
 ### Task 3.1: Parent Profile Management
-**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ✅ Yes
+**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - No UI for parents to update their emergency contact info
@@ -166,7 +167,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ---
 
 ### Task 3.2: Growth Tracking Display
-**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ⚠️ Partial
+**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ⚠️ Partial | **Status:** NOT DONE
 
 **What's Broken:**
 - Growth tracking page exists but no data shown
@@ -189,7 +190,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ---
 
 ### Task 3.3: Vaccination Rescheduling UI
-**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ✅ Yes
+**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ✅ Yes | **Status:** NOT DONE
 
 **What's Broken:**
 - No UI for parents to request rescheduling
@@ -211,7 +212,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ---
 
 ### Task 3.4: Proper Activity Feed
-**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ⚠️ Partial
+**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ⚠️ Partial | **Status:** NOT DONE
 
 **What's Broken:**
 - "Recent Activity" shows children list instead of actual activities
@@ -232,7 +233,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ---
 
 ### Task 3.5: Certificates Feature
-**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ❌ Missing
+**Difficulty:** ⭐⭐⭐ Complex | **Backend Ready:** ❌ Missing | **Status:** NOT DONE
 
 **What's Broken:**
 - Certificates page exists but no data
@@ -257,7 +258,7 @@ A step-by-step plan to integrate all available backend features into the Parent 
 ```
 Week 1:
 ├── Day 1-2: Task 1.1 (Notification Preferences)
-├── Day 3:   Task 1.2 (Vaccine Names)
+├── Day 3:   Task 1.2 (Vaccine Names) ✅ DONE
 └── Day 4:   Task 1.3 (Health Facility)
 
 Week 2:
@@ -283,7 +284,7 @@ Week 4:
 Start with these to see quick progress:
 
 1. **Fix Notification Preferences** - Just connect existing hook to UI
-2. **Show Vaccine Names** - One line change to display proper data
+2. **Show Vaccine Names** - One line change to display proper data ✅ DONE
 3. **Health Facility Data** - Fetch from existing facilities API
 
 These will give immediate visible improvements with minimal code changes.
