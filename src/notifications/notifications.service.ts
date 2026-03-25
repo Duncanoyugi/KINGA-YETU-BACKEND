@@ -3,13 +3,15 @@ import { NotificationQueueService, NotificationOptions } from './notification-qu
 import { SmsProvider, SmsOptions } from './providers/sms.provider';
 import { EmailProvider, EmailOptions } from './providers/email.provider';
 import { PushProvider, PushNotificationOptions } from './providers/push.provider';
-import { NotificationType, PrismaClient } from '@prisma/client';
+import { NotificationType } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly notificationQueue: NotificationQueueService,
     private readonly smsProvider: SmsProvider,
     private readonly emailProvider: EmailProvider,
@@ -260,9 +262,8 @@ export class NotificationsService {
    * Get notification preferences for a user
    */
   async getNotificationPreferences(userId: string) {
-    const prisma = new PrismaClient();
     try {
-      const user = await prisma.user.findUnique({
+      const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: {
           emailNotifications: true,
@@ -286,8 +287,9 @@ export class NotificationsService {
         quietHoursEnd: user.quietHoursEnd ?? '07:00',
         reminderDays: user.reminderDays ?? [7, 3, 1],
       };
-    } finally {
-      await prisma.$disconnect();
+    } catch (error) {
+      this.logger.error(`Failed to get notification preferences: ${error.message}`);
+      throw error;
     }
   }
 
@@ -305,9 +307,8 @@ export class NotificationsService {
       reminderDays?: number[];
     },
   ) {
-    const prisma = new PrismaClient();
     try {
-      const user = await prisma.user.update({
+      const user = await this.prisma.user.update({
         where: { id: userId },
         data: {
           ...(updateData.emailNotifications !== undefined && { emailNotifications: updateData.emailNotifications }),
@@ -341,8 +342,6 @@ export class NotificationsService {
     } catch (error) {
       this.logger.error(`Failed to update notification preferences: ${error.message}`);
       throw error;
-    } finally {
-      await prisma.$disconnect();
     }
   }
 }
