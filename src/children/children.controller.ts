@@ -25,6 +25,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { ChildrenService } from './children.service';
+import { VaccineSchedulerService } from './vaccine-scheduler.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
 import { ChildResponseDto, PaginatedChildrenResponseDto } from './dto/child-response.dto';
@@ -43,6 +44,7 @@ export class ChildrenController {
   
   constructor(
     private readonly childrenService: ChildrenService,
+    private readonly vaccineSchedulerService: VaccineSchedulerService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -63,8 +65,9 @@ export class ChildrenController {
     try {
       this.logger.log(`Creating child for user: ${req.user.id}`);
       this.logger.log(`Request body: ${JSON.stringify(createChildDto)}`);
-      // parentId derived server-side in service from req.user.id
-      return await this.childrenService.create(createChildDto, req.user.id);
+      // Use VaccineSchedulerService to auto-generate vaccination schedule
+      const result = await this.vaccineSchedulerService.createChildWithSchedule(createChildDto, req.user.id);
+      return result.child;
     } catch (error) {
       this.logger.error(`Error creating child: ${error.message}`, error.stack);
       throw error;

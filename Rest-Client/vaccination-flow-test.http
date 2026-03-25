@@ -1,0 +1,147 @@
+# =====================================================
+# Kinga Yetu Digital - Vaccination Process Test
+# Backend: https://kinga-yetu-backend.onrender.com
+# =====================================================
+
+@baseUrl = https://kinga-yetu-backend.onrender.com/api
+@localUrl = http://localhost:5000/api
+
+# Use local for testing, or switch to render
+@url = {{localUrl}}
+
+# =====================================================
+# STEP 1: Login as PARENT
+# =====================================================
+
+### 1.1 Login as Parent
+# Expected: 200 OK with accessToken
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "vivian@gmail.com",
+  "password": "Vivian@1234"
+}
+
+### 
+# Copy the accessToken from response and use below
+@parentToken = YOUR_ACCESS_TOKEN
+
+
+# =====================================================
+# STEP 2: Register a Child
+# =====================================================
+
+### 2.1 Register Child (This auto-generates schedule!)
+# Expected: 201 Created with child data + schedules
+POST {{url}}/children
+Content-Type: application/json
+Authorization: Bearer {{parentToken}}
+
+{
+  "firstName": "Test",
+  "middleName": "Baby",
+  "lastName": "Vaccine",
+  "dateOfBirth": "2025-12-01",
+  "gender": "MALE",
+  "birthCertificateNo": "TEST123456"
+}
+
+
+# =====================================================
+# STEP 3: View Child with Schedule
+# =====================================================
+
+### 3.1 Get All Children for Parent
+# Expected: 200 OK with children array
+GET {{url}}/children
+Authorization: Bearer {{parentToken}}
+
+### 
+# Copy child ID from response
+
+### 3.2 Get Single Child with Schedules
+# Expected: 200 OK with child including schedules array
+GET {{url}}/children/CHILD_ID_HERE
+Authorization: Bearer {{parentToken}}
+
+
+# =====================================================
+# STEP 4: Health Worker Login
+# =====================================================
+
+### 4.1 Login as Health Worker
+# Expected: 200 OK
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "healthworker@kingayetu.co.ke",
+  "password": "Health@1234"
+}
+
+###
+# Copy accessToken
+@healthWorkerToken = YOUR_HEALTH_WORKER_TOKEN
+
+
+# =====================================================
+# STEP 5: Record Immunization (Health Worker)
+# =====================================================
+
+### 5.1 Get Available Vaccines
+# Expected: 200 OK with vaccines array
+GET {{url}}/vaccines
+Authorization: Bearer {{healthWorkerToken}}
+
+### 5.2 Record Immunization
+# Note: Replace childId and vaccineId with actual IDs
+# Expected: 201 Created
+POST {{url}}/immunizations
+Content-Type: application/json
+Authorization: Bearer {{healthWorkerToken}}
+
+{
+  "childId": "CHILD_ID_HERE",
+  "vaccineId": "VACCINE_ID_HERE",
+  "dateAdministered": "2025-12-15",
+  "status": "ADMINISTERED",
+  "administeredBy": "Dr. Test",
+  "facilityId": "FACILITY_ID_HERE"
+}
+
+
+# =====================================================
+# STEP 6: Check Reminders
+# =====================================================
+
+### 6.1 Get Parent's Reminders
+# Expected: 200 OK with reminders array
+GET {{url}}/reminders
+Authorization: Bearer {{parentToken}}
+
+### 6.2 Manually Trigger Reminder Generation (Admin Only)
+# Expected: 200 OK
+POST {{url}}/reminders/generate
+Content-Type: application/json
+Authorization: Bearer {{healthWorkerToken}}
+
+{
+  "startDate": "2025-12-01",
+  "endDate": "2026-06-01"
+}
+
+
+# =====================================================
+# STEP 7: Get Vaccination Schedule Status
+# =====================================================
+
+### 7.1 Get Child's Schedule
+# Expected: 200 OK with schedules showing PENDING/ADMINISTERED
+GET {{url}}/schedules/child/CHILD_ID_HERE
+Authorization: Bearer {{parentToken}}
+
+### 7.2 Get Upcoming Vaccines
+# Expected: 200 OK with upcoming vaccines
+GET {{url}}/schedules/upcoming?childId=CHILD_ID_HERE
+Authorization: Bearer {{parentToken}}
