@@ -15,6 +15,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -65,13 +66,61 @@ export class ChildrenController {
     try {
       this.logger.log(`Creating child for user: ${req.user.id}`);
       this.logger.log(`Request body: ${JSON.stringify(createChildDto)}`);
+      
+      // Validate and clean the DTO before processing
+      const cleanedDto = this.cleanChildDto(createChildDto);
+      this.logger.log(`Cleaned DTO: ${JSON.stringify(cleanedDto)}`);
+      
       // Use VaccineSchedulerService to auto-generate vaccination schedule
-      const result = await this.vaccineSchedulerService.createChildWithSchedule(createChildDto, req.user.id);
+      const result = await this.vaccineSchedulerService.createChildWithSchedule(cleanedDto, req.user.id);
       return result.child;
     } catch (error) {
       this.logger.error(`Error creating child: ${error.message}`, error.stack);
+      
+      // Provide more helpful error messages
+      if (error.message.includes('Parent profile not found')) {
+        throw new NotFoundException('Your parent profile is not set up. Please contact support.');
+      }
+      if (error.code === 'P2002') {
+        throw new ConflictException('Birth certificate number already exists');
+      }
       throw error;
     }
+  }
+
+  private cleanChildDto(dto: CreateChildDto): CreateChildDto {
+    // Remove empty strings and convert to undefined
+    const cleaned: any = { ...dto };
+    
+    if (cleaned.birthFacilityName === '') {
+      cleaned.birthFacilityName = undefined;
+    }
+    if (cleaned.birthCertificateNo === '') {
+      cleaned.birthCertificateNo = undefined;
+    }
+    if (cleaned.middleName === '') {
+      cleaned.middleName = undefined;
+    }
+    if (cleaned.notes === '') {
+      cleaned.notes = undefined;
+    }
+    if (cleaned.complications === '') {
+      cleaned.complications = undefined;
+    }
+    if (cleaned.deliveryMethod === '') {
+      cleaned.deliveryMethod = undefined;
+    }
+    if (cleaned.gestationalAge === '') {
+      cleaned.gestationalAge = undefined;
+    }
+    if (cleaned.birthWeight === '') {
+      cleaned.birthWeight = undefined;
+    }
+    if (cleaned.birthHeight === '') {
+      cleaned.birthHeight = undefined;
+    }
+    
+    return cleaned;
   }
 
   @Get()
