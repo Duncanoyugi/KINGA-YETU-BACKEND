@@ -277,6 +277,19 @@ export class ChildrenRepository {
     return this.prisma.child.findMany({
       where: { parentId },
       include: {
+        parent: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                phoneNumber: true,
+              },
+            },
+          },
+        },
         birthFacility: {
           select: {
             id: true,
