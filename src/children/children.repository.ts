@@ -290,7 +290,6 @@ async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Chi
           },
         },
         schedules: {
-          take: 3,
           orderBy: { dueDate: 'asc' },
           where: { status: 'SCHEDULED' },
           select: {
