@@ -218,7 +218,7 @@ export class SchedulesController {
   }
 
   @Patch(':id/reschedule')
-  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.PARENT)
   @ApiOperation({ summary: 'Reschedule a vaccine' })
   @ApiResponse({
     status: 200,
