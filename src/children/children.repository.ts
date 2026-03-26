@@ -8,7 +8,10 @@ import { UpdateChildDto } from './dto/update-child.dto';
 export class ChildrenRepository {
   constructor(private prisma: PrismaService) {}
 
-async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Child> {
+  async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Child> {
+    console.log(`Repository: Creating child with data: ${JSON.stringify(createChildDto)}`);
+    console.log(`Repository: Parent ID: ${createChildDto.parentId}`);
+
     const {
       parentId,
       birthFacilityId,
@@ -44,32 +47,40 @@ async create(createChildDto: CreateChildDto & { parentId: string }): Promise<Chi
       ...(notes && { notes }),
     };
 
-    return this.prisma.child.create({
-      data,
-      include: {
-        parent: {
-          select: {
-            id: true,
-            user: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-                phoneNumber: true,
+    console.log(`Repository: Prisma data prepared, creating child...`);
+    try {
+      const result = await this.prisma.child.create({
+        data,
+        include: {
+          parent: {
+            select: {
+              id: true,
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  phoneNumber: true,
+                },
               },
             },
           },
-        },
-        birthFacility: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            code: true,
+          birthFacility: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              code: true,
+            },
           },
         },
-      },
-    });
+      });
+      console.log(`Repository: Child created successfully with ID: ${result.id}`);
+      return result;
+    } catch (error) {
+      console.error(`Repository: Error creating child: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   async findAll(params: {

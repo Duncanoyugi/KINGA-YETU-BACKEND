@@ -56,11 +56,16 @@ export class VaccineSchedulerService {
     child: ChildResponseDto;
     schedules: any[];
   }> {
+    console.log(`VaccineScheduler: Starting child creation for userId: ${userId}`);
+    console.log(`VaccineScheduler: DTO: ${JSON.stringify(createChildDto)}`);
+    
     // Create the child
     const child = await this.childrenService.create(createChildDto, userId);
+    console.log(`VaccineScheduler: Child created with ID: ${child.id}, parentId: ${child.parentId}`);
     
     // Generate vaccination schedules
     const schedules = await this.generateVaccinationSchedules(child.id, child.parentId, new Date(createChildDto.dateOfBirth));
+    console.log(`VaccineScheduler: Generated ${schedules.length} vaccination schedules`);
     
     return {
       child,

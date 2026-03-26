@@ -100,11 +100,15 @@ export class ChildrenService {
       throw new BadRequestException('User ID is required');
     }
 
+    this.logger.log(`Creating child with DTO: ${JSON.stringify(createChildDto)}`);
+    this.logger.log(`User ID: ${userId}`);
+
     try {
       // Derive parent server-side (auto-create if missing)
       // Priority: 1) Use parentId from DTO if provided (for ADMIN/HEALTH_WORKER), 2) Derive from userId
       let parent;
       if (createChildDto.parentId) {
+        this.logger.log(`Looking for parent with provided parentId: ${createChildDto.parentId}`);
         parent = await this.prisma.parent.findUnique({
           where: { id: createChildDto.parentId },
         });
@@ -112,6 +116,7 @@ export class ChildrenService {
           throw new NotFoundException('Parent not found');
         }
       } else {
+        this.logger.log(`Looking for parent by userId: ${userId}`);
         parent = await this.prisma.parent.findUnique({
           where: { userId },
         });
@@ -121,11 +126,12 @@ export class ChildrenService {
           parent = await this.prisma.parent.create({
             data: { userId },
           });
+          this.logger.log(`Created new parent with ID: ${parent.id}`);
         }
       }
 
       const parentId = parent.id;
-      this.logger.log(`Using parentId: ${parentId}`);
+      this.logger.log(`Using parentId: ${parentId} for child creation`);
 
       // Merge with DTO
       const dtoWithParent = { ...createChildDto, parentId };

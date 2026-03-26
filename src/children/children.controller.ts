@@ -64,18 +64,21 @@ export class ChildrenController {
     @Request() req: any,
   ): Promise<ChildResponseDto> {
     try {
-      this.logger.log(`Creating child for user: ${req.user.id}`);
-      this.logger.log(`Request body: ${JSON.stringify(createChildDto)}`);
+      console.log(`[ChildrenController] Creating child for user: ${req.user.id}`);
+      console.log(`[ChildrenController] Request body: ${JSON.stringify(createChildDto)}`);
+      console.log(`[ChildrenController] User role: ${req.user.role}`);
+      console.log(`[ChildrenController] User has parentProfile: ${!!req.user.parentProfile}`);
       
       // Validate and clean the DTO before processing
       const cleanedDto = this.cleanChildDto(createChildDto);
-      this.logger.log(`Cleaned DTO: ${JSON.stringify(cleanedDto)}`);
+      console.log(`[ChildrenController] Cleaned DTO: ${JSON.stringify(cleanedDto)}`);
       
       // Use VaccineSchedulerService to auto-generate vaccination schedule
       const result = await this.vaccineSchedulerService.createChildWithSchedule(cleanedDto, req.user.id);
+      console.log(`[ChildrenController] Child created successfully with ID: ${result.child.id}`);
       return result.child;
     } catch (error) {
-      this.logger.error(`Error creating child: ${error.message}`, error.stack);
+      console.error(`[ChildrenController] Error creating child: ${error.message}`, error.stack);
       
       // Provide more helpful error messages
       if (error.message.includes('Parent profile not found')) {
