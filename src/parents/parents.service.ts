@@ -560,10 +560,12 @@ export class ParentsService {
 
     for (const child of parent.children) {
       completedVaccinations += child.immunizations.filter(i => i.status === 'ADMINISTERED').length;
-      upcomingVaccinations += child.schedules.filter(s => s.status === 'SCHEDULED').length;
-      missedVaccinations += child.schedules.filter(s => 
-        s.status === 'MISSED' || 
-        (s.status === 'SCHEDULED' && new Date(s.dueDate) < new Date())
+      upcomingVaccinations += child.schedules.filter(s =>
+        ['SCHEDULED', 'PENDING'].includes(s.status) && new Date(s.dueDate) >= new Date()
+      ).length;
+      missedVaccinations += child.schedules.filter(s =>
+        s.status === 'MISSED' ||
+        (['SCHEDULED', 'PENDING'].includes(s.status) && new Date(s.dueDate) < new Date())
       ).length;
     }
 

@@ -330,10 +330,25 @@ export class ScheduleCalculatorService {
 
     // Filter by facility if specified
     if (facilityId) {
-      return schedules.filter(schedule => 
-        schedule.child.birthFacility?.id === facilityId ||
-        schedule.child.parent?.user.profile?.county?.includes(facilityId) // Fallback to county match
-      );
+      return schedules
+        .filter(schedule => schedule.child.birthFacility?.id === facilityId)
+        .map(schedule => ({
+          id: schedule.id,
+          childId: schedule.child.id,
+          childName: `${schedule.child.firstName} ${schedule.child.lastName}`,
+          childDateOfBirth: schedule.child.dateOfBirth,
+          vaccineId: schedule.vaccine.id,
+          vaccineCode: schedule.vaccine.code,
+          vaccineName: schedule.vaccine.name,
+          dueDate: schedule.dueDate,
+          daysUntilDue: Math.ceil((schedule.dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+          parentName: schedule.child.parent?.user.fullName,
+          parentEmail: schedule.child.parent?.user.email,
+          parentPhone: schedule.child.parent?.user.phoneNumber,
+          county: schedule.child.parent?.user.profile?.county,
+          subCounty: schedule.child.parent?.user.profile?.subCounty,
+          birthFacility: schedule.child.birthFacility?.name,
+        }));
     }
 
     return schedules.map(schedule => ({

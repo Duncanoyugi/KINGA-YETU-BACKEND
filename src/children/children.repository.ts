@@ -315,7 +315,6 @@ export class ChildrenRepository {
         },
         schedules: {
           orderBy: { dueDate: 'asc' },
-          where: { status: 'SCHEDULED' },
           select: {
             id: true,
             vaccine: {
