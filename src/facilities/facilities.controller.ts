@@ -7,23 +7,32 @@ import {
   Body,
   Param,
   Query,
+  Request,
   HttpCode,
   HttpStatus,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/create-facility.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { FacilityFilter } from './facilities.repository';
-import { HealthFacilityType } from '@prisma/client';
+import { HealthFacilityType, UserRole } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UsersService } from '../users/users.service';
 
 @ApiTags('facilities')
 @Controller('facilities')
 @UsePipes(new ValidationPipe({ transform: true }))
 export class FacilitiesController {
-  constructor(private readonly facilitiesService: FacilitiesService) {}
+  constructor(
+    private readonly facilitiesService: FacilitiesService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all facilities with optional filters' })
@@ -89,12 +98,25 @@ export class FacilitiesController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new facility' })
   @ApiResponse({ status: 201 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 409, description: 'Facility with this code already exists' })
-  async createFacility(@Body() createFacilityDto: CreateFacilityDto) {
-    return this.facilitiesService.create(createFacilityDto);
+  async createFacility(@Body() createFacilityDto: CreateFacilityDto, @Request() req: any) {
+    const facility = await this.facilitiesService.create(createFacilityDto);
+
+    if (req.user?.role === UserRole.HEALTH_WORKER) {
+      await this.usersService.update(req.user.id, {
+        facilityId: facility.id,
+      });
+    }
+
+    return facility;
   }
 
   @Patch(':id')

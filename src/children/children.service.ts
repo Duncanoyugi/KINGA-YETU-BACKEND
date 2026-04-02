@@ -104,8 +104,16 @@ export class ChildrenService {
     this.logger.log(`User ID: ${userId}`);
 
     try {
-      // Derive parent server-side (auto-create if missing)
-      // Priority: 1) Use parentId from DTO if provided (for ADMIN/HEALTH_WORKER), 2) Derive from userId
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true },
+      });
+
+      if (!user) {
+        throw new BadRequestException('Authenticated user not found');
+      }
+
+      // Derive parent server-side
       let parent;
       if (createChildDto.parentId) {
         this.logger.log(`Looking for parent with provided parentId: ${createChildDto.parentId}`);
@@ -115,7 +123,7 @@ export class ChildrenService {
         if (!parent) {
           throw new NotFoundException('Parent not found');
         }
-      } else {
+      } else if (user.role === 'PARENT') {
         this.logger.log(`Looking for parent by userId: ${userId}`);
         parent = await this.prisma.parent.findUnique({
           where: { userId },
@@ -128,6 +136,20 @@ export class ChildrenService {
           });
           this.logger.log(`Created new parent with ID: ${parent.id}`);
         }
+      } else {
+        throw new BadRequestException(
+          'Parent ID is required when registering a child as a health worker or admin',
+        );
+      }
+
+      if (!user) {
+        throw new BadRequestException('Authenticated user not found');
+      }
+
+      if (!createChildDto.parentId && user.role !== 'PARENT') {
+        throw new BadRequestException(
+          'Parent ID is required when registering a child as a health worker or admin',
+        );
       }
 
       const parentId = parent.id;
@@ -137,15 +159,9 @@ export class ChildrenService {
       const dtoWithParent = { ...createChildDto, parentId };
       this.logger.log(`DTO with parent: ${JSON.stringify(dtoWithParent)}`);
 
-      // Check authorization for non-owner
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, role: true },
-      });
-
       // For PARENT role, they can only register for themselves (userId === parent.userId)
       // For ADMIN/HEALTH_WORKER/SUPER_ADMIN, they can register for any parent
-      if (user?.role === 'PARENT' && userId !== parent.userId) {
+      if (user.role === 'PARENT' && userId !== parent.userId) {
         throw new ForbiddenException('Unauthorized to register a child for another parent');
       }
 

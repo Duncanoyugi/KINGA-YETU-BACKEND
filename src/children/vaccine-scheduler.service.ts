@@ -237,11 +237,13 @@ export class VaccineSchedulerService {
         // Calculate due date (immediate for catchup)
         const dueDate = new Date();
         
-        // For vaccines that should have been given earlier, schedule immediately
+        // For vaccines that should have been given earlier, schedule within 1 week
         if (childAgeDays > vaccineSchedule.ageDays) {
-          dueDate.setDate(dueDate.getDate() + 7); // Schedule within 1 week
+          dueDate.setDate(dueDate.getDate() + 7);
         } else {
-          dueDate.setDate(dateOfBirth.getDate() + vaccineSchedule.ageDays);
+          const scheduledDate = new Date(dateOfBirth);
+          scheduledDate.setDate(scheduledDate.getDate() + vaccineSchedule.ageDays);
+          dueDate.setTime(scheduledDate.getTime());
         }
         
         catchupSchedules.push({
