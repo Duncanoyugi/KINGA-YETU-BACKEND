@@ -412,4 +412,107 @@ export class VaccinesService {
       totalAdministrations: vaccine._count.immunizations,
     }));
   }
+
+  // ============ Inventory Methods ============
+
+  async addInventory(inventoryDto: any) {
+    const { vaccineId, facilityId, quantity, batchNumber, expiryDate, manufacturer } = inventoryDto;
+    
+    // Check if inventory already exists for this vaccine and facility
+    let inventory = await this.prisma.vaccineInventory.findFirst({
+      where: {
+        vaccineId,
+        facilityId,
+        batchNumber,
+      },
+    });
+
+    if (inventory) {
+      // Update existing inventory
+      inventory = await this.prisma.vaccineInventory.update({
+        where: { id: inventory.id },
+        data: {
+          quantity: inventory.quantity + quantity,
+        },
+      });
+    } else {
+      // Create new inventory
+      inventory = await this.prisma.vaccineInventory.create({
+        data: {
+          vaccineId,
+          facilityId,
+          quantity,
+          batchNumber,
+          expiryDate: new Date(expiryDate),
+          manufacturer,
+        },
+      });
+    }
+
+    return inventory;
+  }
+
+  async getInventory(facilityId?: string) {
+    const where = facilityId ? { facilityId } : {};
+    
+    const inventory = await this.prisma.vaccineInventory.findMany({
+      where,
+    });
+
+    return {
+      data: inventory,
+      total: inventory.length,
+    };
+  }
+
+  async getInventoryByFacility(facilityId: string) {
+    const inventory = await this.prisma.vaccineInventory.findMany({
+      where: { facilityId },
+    });
+
+    return {
+      data: inventory,
+      total: inventory.length,
+    };
+  }
+
+  async getStockAlerts(facilityId?: string) {
+    const where = facilityId ? { facilityId } : {};
+    
+    const inventory = await this.prisma.vaccineInventory.findMany({
+      where,
+    });
+
+    const alerts: any[] = [];
+    const today = new Date();
+    const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    for (const item of inventory) {
+      // Check for low stock (threshold is typically 10)
+      if (item.quantity <= 10) {
+        alerts.push({
+          severity: item.quantity === 0 ? 'HIGH' : 'MEDIUM',
+          vaccineId: item.vaccineId,
+          vaccineName: 'Vaccine',
+          batchNumber: item.batchNumber,
+          status: item.quantity === 0 ? 'Out of Stock' : 'Low Stock',
+          message: `Vaccine has ${item.quantity} doses remaining`,
+        });
+      }
+
+      // Check for expiring
+      if (item.expiryDate && new Date(item.expiryDate) <= thirtyDaysFromNow) {
+        alerts.push({
+          severity: new Date(item.expiryDate) <= today ? 'HIGH' : 'MEDIUM',
+          vaccineId: item.vaccineId,
+          vaccineName: 'Vaccine',
+          batchNumber: item.batchNumber,
+          status: new Date(item.expiryDate) <= today ? 'Expired' : 'Expiring Soon',
+          message: `Vaccine batch ${item.batchNumber} expires on ${item.expiryDate}`,
+        });
+      }
+    }
+
+    return alerts;
+  }
 }

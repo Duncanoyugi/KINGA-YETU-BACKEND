@@ -192,6 +192,44 @@ export class VaccinesController {
     return this.vaccinesService.remove(id);
   }
 
+  // ============ Inventory Endpoints ============
+
+  @Post('inventory')
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Add vaccine inventory stock' })
+  @ApiResponse({
+    status: 201,
+    description: 'Inventory added successfully',
+  })
+  async addInventory(@Body() inventoryDto: any): Promise<any> {
+    return this.vaccinesService.addInventory(inventoryDto);
+  }
+
+  @Get('inventory')
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get vaccine inventory' })
+  @ApiQuery({ name: 'facilityId', required: false })
+  async getInventory(@Query('facilityId') facilityId?: string): Promise<any> {
+    return this.vaccinesService.getInventory(facilityId);
+  }
+
+  @Get('inventory/facility/:facilityId')
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get vaccine inventory by facility' })
+  async getInventoryByFacility(@Param('facilityId') facilityId: string): Promise<any> {
+    return this.vaccinesService.getInventoryByFacility(facilityId);
+  }
+
+  @Get('alerts')
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get stock alerts' })
+  @ApiQuery({ name: 'facilityId', required: false })
+  async getStockAlerts(@Query('facilityId') facilityId?: string): Promise<any> {
+    return this.vaccinesService.getStockAlerts(facilityId);
+  }
+
+  // ============ End Inventory Endpoints ============
+
   @Get('validate/:vaccineCode/:childAgeDays')
   @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Validate vaccine for child age' })

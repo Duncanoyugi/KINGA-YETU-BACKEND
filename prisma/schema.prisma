@@ -363,6 +363,22 @@ model Immunization {
   @@map("immunizations")
 }
 
+model VaccineInventory {
+  id            String    @id @default(cuid())
+  vaccineId     String
+  facilityId    String
+  quantity     Int       @default(0)
+  batchNumber  String?
+  expiryDate   DateTime?
+  manufacturer String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([vaccineId])
+  @@index([facilityId])
+  @@map("vaccine_inventory")
+}
+
 model VaccinationSchedule {
   id        String        @id @default(cuid())
   childId   String
