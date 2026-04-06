@@ -22,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { ParentsService } from './parents.service';
 import { ParentProfileDto } from './dto/parent-profile.dto';
+import { UpdateParentProfileDto } from './dto/update-parent-profile.dto';
 import { LinkChildDto } from './dto/link-child.dto';
 import { ParentResponseDto, PaginatedParentsResponseDto } from './dto/parent-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -183,10 +184,10 @@ export class ParentsController {
   })
   @ApiResponse({ status: 404, description: 'Parent profile not found' })
   async updateProfile(
-    @Body() parentProfileDto: ParentProfileDto,
+    @Body() profileData: UpdateParentProfileDto,
     @Request() req: any,
   ): Promise<ParentResponseDto> {
-    return this.parentsService.updateParentProfile(req.user.id, parentProfileDto);
+    return this.parentsService.updateParentProfile(req.user.id, profileData);
   }
 
   @Post(':id/link-child')

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ParentProfileDto } from './dto/parent-profile.dto';
+import { UpdateParentProfileDto } from './dto/update-parent-profile.dto';
 import { ParentResponseDto, PaginatedParentsResponseDto } from './dto/parent-response.dto';
 import { LinkChildDto } from './dto/link-child.dto';
 
@@ -291,7 +292,7 @@ export class ParentsService {
     return this.mapToParentResponseDto(parent);
   }
 
-  async updateParentProfile(userId: string, profileData: ParentProfileDto): Promise<ParentResponseDto> {
+  async updateParentProfile(userId: string, profileData: UpdateParentProfileDto): Promise<ParentResponseDto> {
     // Check if parent exists
     let parent = await this.prisma.parent.findUnique({
       where: { userId },
