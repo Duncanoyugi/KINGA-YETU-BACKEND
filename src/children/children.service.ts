@@ -277,6 +277,65 @@ export class ChildrenService {
     return children.map(child => this.mapToChildResponseDto(child));
   }
 
+  async getChildDashboard(childId: string) {
+    const child = await this.childrenRepository.findOne(childId);
+    if (!child) {
+      throw new NotFoundException(`Child with ID ${childId} not found`);
+    }
+
+    // Get upcoming vaccinations
+    const upcomingSchedules = await this.prisma.vaccinationSchedule.findMany({
+      where: {
+        childId,
+        dueDate: { gte: new Date() },
+        status: { in: ['SCHEDULED', 'PENDING'] },
+      },
+      orderBy: { dueDate: 'asc' },
+      take: 5,
+      include: {
+        vaccine: true,
+      },
+    });
+
+    // Get recent growth records
+    const recentGrowth = await this.prisma.growthRecord.findMany({
+      where: { childId },
+      orderBy: { measurementDate: 'desc' },
+      take: 5,
+    });
+
+    // Get immunization history
+    const immunizationHistory = await this.prisma.immunization.findMany({
+      where: { childId },
+      orderBy: { dateAdministered: 'desc' },
+    });
+
+    // Calculate completion rate
+    const totalSchedules = await this.prisma.vaccinationSchedule.count({
+      where: { childId },
+    });
+    const completedImmunizations = immunizationHistory.filter(i => i.status === 'ADMINISTERED').length;
+    const completionRate = totalSchedules > 0 ? Math.round((completedImmunizations / totalSchedules) * 100) : 0;
+
+    return {
+      child: this.mapToChildResponseDto(child),
+      upcomingVaccinations: upcomingSchedules.map(s => ({
+        id: s.id,
+        vaccineName: s.vaccine.name,
+        dueDate: s.dueDate,
+        status: s.status,
+      })),
+      recentGrowth: recentGrowth.map(g => ({
+        id: g.id,
+        weight: g.weight,
+        height: g.height,
+        measurementDate: g.measurementDate,
+      })),
+      immunizationHistory,
+      completionRate,
+    };
+  }
+
   async update(id: string, updateChildDto: UpdateChildDto, userId?: string): Promise<ChildResponseDto> {
     // Check if child exists
     const existingChild = await this.childrenRepository.findOne(id);
