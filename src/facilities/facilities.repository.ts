@@ -18,7 +18,10 @@ export class FacilitiesRepository {
     const where: Prisma.HealthFacilityWhereInput = {};
 
     if (filter?.county) {
-      where.county = filter.county;
+      where.county = {
+        equals: filter.county,
+        mode: 'insensitive',
+      };
     }
 
     if (filter?.subCounty) {
@@ -57,7 +60,12 @@ export class FacilitiesRepository {
 
   async findByCounty(county: string): Promise<HealthFacility[]> {
     return this.prisma.healthFacility.findMany({
-      where: { county },
+      where: { 
+        county: {
+          equals: county,
+          mode: 'insensitive',
+        },
+      },
       orderBy: { name: 'asc' },
     });
   }
