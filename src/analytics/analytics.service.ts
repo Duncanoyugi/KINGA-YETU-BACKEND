@@ -508,10 +508,8 @@ export class AnalyticsService {
       const fullyImmunized = await this.prisma.child.count({
         where: {
           birthFacilityId: facilityId,
-          schedules: {
-            some: {
-              status: 'COMPLETED',
-            },
+          immunizations: {
+            some: {},
           },
         },
       });
