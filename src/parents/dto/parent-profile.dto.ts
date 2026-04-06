@@ -5,16 +5,20 @@ export class ParentProfileDto {
   @ApiProperty({
     example: 'Jane Doe',
     description: 'Parent full name',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  fullName: string;
+  fullName?: string;
 
   @ApiProperty({
     example: 'jane.doe@example.com',
     description: 'Parent email',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  email: string;
+  email?: string;
 
   @ApiProperty({
     example: '+254712345678',
