@@ -16,6 +16,7 @@ import {
   ComparisonResponseDto,
   SystemStatsDto,
   PerformanceMetricsDto,
+  HealthWorkerDashboardStatsDto,
 } from './dto/analytics-response.dto';
 import { AnalyticsMetric, AnalyticsPeriod } from './dto/analytics-request.dto';
 import { CountyAdminDashboardDto, CoverageAlertDto } from './dto/county-admin-dashboard.dto';
@@ -429,6 +430,109 @@ export class AnalyticsService {
       };
     } catch (error) {
       this.logger.error(`Error getting performance metrics: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get health worker dashboard statistics for a specific facility
+   */
+  async getHealthWorkerDashboardStats(facilityId: string): Promise<HealthWorkerDashboardStatsDto> {
+    try {
+      const facility = await this.prisma.healthFacility.findUnique({
+        where: { id: facilityId },
+      });
+
+      if (!facility) {
+        throw new Error('Facility not found');
+      }
+
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const [
+        totalChildren,
+        vaccinationsThisMonth,
+        missedAppointments,
+        upcomingVaccinations,
+        overdueVaccinations,
+        totalVaccineStock,
+        lowStockAlerts,
+        reportsGenerated,
+      ] = await Promise.all([
+        this.prisma.child.count({
+          where: { birthFacilityId: facilityId },
+        }),
+        this.prisma.immunization.count({
+          where: {
+            facilityId,
+            dateAdministered: { gte: startOfMonth, lte: endOfMonth },
+          },
+        }),
+        this.prisma.vaccinationSchedule.count({
+          where: {
+            child: { birthFacilityId: facilityId },
+            status: 'MISSED',
+          },
+        }),
+        this.prisma.vaccinationSchedule.count({
+          where: {
+            child: { birthFacilityId: facilityId },
+            status: 'PENDING',
+            dueDate: { gte: now, lte: moment(now).add(7, 'days').toDate() },
+          },
+        }),
+        this.prisma.vaccinationSchedule.count({
+          where: {
+            child: { birthFacilityId: facilityId },
+            status: { in: ['PENDING', 'SCHEDULED'] },
+            dueDate: { lt: now },
+          },
+        }),
+        this.prisma.vaccineInventory.aggregate({
+          where: { facilityId },
+          _sum: { quantity: true },
+        }),
+        this.prisma.vaccineInventory.count({
+          where: {
+            facilityId,
+            quantity: { lte: 10 },
+          },
+        }),
+        this.prisma.report.count({
+          where: { generatedBy: { healthWorker: { facilityId } } },
+        }),
+      ]);
+
+      const fullyImmunized = await this.prisma.child.count({
+        where: {
+          birthFacilityId: facilityId,
+          schedules: {
+            some: {
+              status: 'COMPLETED',
+            },
+          },
+        },
+      });
+
+      const coverageRate = totalChildren > 0 ? (fullyImmunized / totalChildren) * 100 : 0;
+
+      return {
+        facilityName: facility.name,
+        totalChildren,
+        fullyImmunized,
+        coverageRate: Math.round(coverageRate * 10) / 10,
+        vaccinationsThisMonth,
+        missedAppointments,
+        upcomingVaccinations,
+        overdueVaccinations,
+        totalVaccineStock: totalVaccineStock._sum.quantity || 0,
+        lowStockAlerts,
+        reportsGenerated,
+      };
+    } catch (error) {
+      this.logger.error(`Error getting health worker dashboard stats: ${error.message}`);
       throw error;
     }
   }

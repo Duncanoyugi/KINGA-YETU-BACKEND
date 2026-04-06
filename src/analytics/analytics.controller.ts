@@ -27,6 +27,7 @@ import {
   ComparisonResponseDto,
   SystemStatsDto,
   PerformanceMetricsDto,
+  HealthWorkerDashboardStatsDto,
 } from './dto/analytics-response.dto';
 
 @ApiTags('analytics')
@@ -167,7 +168,6 @@ export class AnalyticsController {
       this.analyticsService.getPerformanceMetrics(),
     ]);
 
-    // Get recent coverage trend
     const endDate = new Date();
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 6);
@@ -187,6 +187,16 @@ export class AnalyticsController {
       coverageTrend: coverageAnalytics[0]?.dataPoints.slice(-6) || [],
       lastUpdated: new Date(),
     };
+  }
+
+  @Get('health-worker-dashboard/:facilityId')
+  @ApiOperation({ summary: 'Get health worker dashboard statistics for a facility' })
+  @ApiParam({ name: 'facilityId', type: String })
+  @ApiResponse({ status: 200, type: HealthWorkerDashboardStatsDto })
+  async getHealthWorkerDashboardStats(
+    @Param('facilityId') facilityId: string,
+  ): Promise<HealthWorkerDashboardStatsDto> {
+    return this.analyticsService.getHealthWorkerDashboardStats(facilityId);
   }
 
   @Get('anomalies')

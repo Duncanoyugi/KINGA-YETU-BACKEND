@@ -215,3 +215,38 @@ export class PerformanceMetricsDto {
   @ApiProperty()
   generatedAt: Date;
 }
+
+export class HealthWorkerDashboardStatsDto {
+  @ApiProperty()
+  facilityName: string;
+
+  @ApiProperty()
+  totalChildren: number;
+
+  @ApiProperty()
+  fullyImmunized: number;
+
+  @ApiProperty()
+  coverageRate: number;
+
+  @ApiProperty()
+  vaccinationsThisMonth: number;
+
+  @ApiProperty()
+  missedAppointments: number;
+
+  @ApiProperty()
+  upcomingVaccinations: number;
+
+  @ApiProperty()
+  overdueVaccinations: number;
+
+  @ApiProperty()
+  totalVaccineStock: number;
+
+  @ApiProperty()
+  lowStockAlerts: number;
+
+  @ApiProperty()
+  reportsGenerated: number;
+}
