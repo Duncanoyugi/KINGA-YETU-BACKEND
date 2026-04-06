@@ -349,6 +349,14 @@ model Immunization {
   dateAdministered DateTime          @default(now())
   status           ImmunizationStatus @default(SCHEDULED)
   batchNumber      String?
+  expirationDate   DateTime?
+  manufacturer     String?
+  administrationSite String?
+  dosage           String?
+  hadAdverseReaction Boolean          @default(false)
+  adverseReactionDetails String?
+  contraindications String?
+  administeredBy   String?
   notes            String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -407,6 +415,7 @@ model Reminder {
   message      String
   scheduledFor DateTime
   status       ReminderStatus @default(PENDING)
+  priority     Int           @default(3)
   metadata     String?       @default("{}")
   retryCount   Int           @default(0)
   batchNumber  String?

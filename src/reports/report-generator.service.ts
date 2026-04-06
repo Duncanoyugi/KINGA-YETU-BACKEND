@@ -737,23 +737,69 @@ export class ReportGeneratorService {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Report');
 
-    // Parse HTML table and add to Excel
-    // This is a simplified implementation
-    worksheet.columns = [
-      { header: 'Metric', key: 'metric', width: 30 },
-      { header: 'Value', key: 'value', width: 20 },
-    ];
-
-    worksheet.addRow({ metric: 'Report', value: 'Generated from HTML' });
+    // Parse HTML to extract table data
+    const tableMatch = htmlContent.match(/<table[^>]*>([\s\S]*?)<\/table>/i);
+    
+    if (tableMatch) {
+      const rows = tableMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      
+      rows.forEach((row, index) => {
+        const cells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
+        const rowData: Record<string, string> = {};
+        
+        cells.forEach((cell, cellIndex) => {
+          const value = cell.replace(/<[^>]+>/g, '').trim();
+          if (index === 0) {
+            worksheet.columns = worksheet.columns || [];
+            worksheet.columns[cellIndex] = { header: value, key: `col${cellIndex}`, width: 20 };
+            worksheet.addRow({ [`col${cellIndex}`]: '' });
+          } else if (worksheet.columns[cellIndex]) {
+            rowData[`col${cellIndex}`] = value;
+          }
+        });
+        
+        if (Object.keys(rowData).length > 0) {
+          worksheet.addRow(rowData);
+        }
+      });
+    } else {
+      // Fallback if no table found
+      worksheet.columns = [
+        { header: 'Report', key: 'report', width: 30 },
+        { header: 'Generated', key: 'date', width: 20 },
+      ];
+      worksheet.addRow({ report: 'Immunization Report', date: new Date().toISOString() });
+    }
 
     await workbook.xlsx.writeFile(outputPath);
     this.logger.log(`Excel file generated: ${outputPath}`);
   }
 
   private async generateCSV(htmlContent: string, outputPath: string): Promise<void> {
-    // Simplified CSV generation
-    const csvContent = 'Metric,Value\nReport,Generated from HTML';
-    fs.writeFileSync(outputPath, csvContent);
+    const rows: string[] = [];
+    
+    // Parse HTML table to extract data
+    const tableMatch = htmlContent.match(/<table[^>]*>([\s\S]*?)<\/table>/i);
+    
+    if (tableMatch) {
+      const trMatches = tableMatch[1].match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      
+      for (const tr of trMatches) {
+        const tdMatches = tr.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
+        const row = tdMatches.map(td => {
+          const value = td.replace(/<[^>]+>/g, '').trim();
+          // Escape quotes and wrap in quotes if contains comma
+          return value.includes(',') ? `"${value.replace(/"/g, '""')}"` : value;
+        });
+        rows.push(row.join(','));
+      }
+    } else {
+      // Fallback - generate basic CSV
+      rows.push('Report,Generated Date');
+      rows.push(`Immunization Report,${new Date().toISOString()}`);
+    }
+
+    fs.writeFileSync(outputPath, rows.join('\n'), 'utf-8');
     this.logger.log(`CSV file generated: ${outputPath}`);
   }
 
@@ -969,10 +1015,60 @@ export class ReportGeneratorService {
     parameters: Record<string, any>,
     userId: string,
   ): Promise<any> {
-    // Implementation for demographic report
+    const { startDate, endDate, dimension = 'gender' } = parameters;
+    const start = startDate ? new Date(startDate) : new Date(new Date().setMonth(new Date().getMonth() - 6));
+    const end = endDate ? new Date(endDate) : new Date();
+
+    // Get children with their immunizations
+    const children = await this.prisma.child.findMany({
+      include: {
+        immunizations: {
+          where: {
+            dateAdministered: { gte: start, lte: end },
+          },
+        },
+      },
+    });
+
+    // Group by dimension (gender or age group)
+    const demographicData: Record<string, { total: number; vaccinated: number; coverage: number }> = {};
+
+    for (const child of children) {
+      const hasImmunization = child.immunizations.length > 0;
+      
+      let key: string;
+      if (dimension === 'gender') {
+        key = child.gender;
+      } else {
+        // Age group
+        const ageMonths = Math.floor((new Date().getTime() - new Date(child.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 30));
+        if (ageMonths < 12) key = '0-11 months';
+        else if (ageMonths < 24) key = '12-23 months';
+        else if (ageMonths < 36) key = '24-35 months';
+        else key = '36+ months';
+      }
+
+      if (!demographicData[key]) {
+        demographicData[key] = { total: 0, vaccinated: 0, coverage: 0 };
+      }
+      demographicData[key].total++;
+      if (hasImmunization) demographicData[key].vaccinated++;
+    }
+
+    // Calculate coverage percentages
+    Object.keys(demographicData).forEach(key => {
+      const data = demographicData[key];
+      data.coverage = data.total > 0 ? Math.round((data.vaccinated / data.total) * 1000) / 10 : 0;
+    });
+
     return {
-      message: 'Demographic report would be generated here',
-      parameters,
+      dimension,
+      period: { start: start.toISOString(), end: end.toISOString() },
+      data: demographicData,
+      summary: {
+        totalChildren: children.length,
+        totalVaccinated: children.filter(c => c.immunizations.length > 0).length,
+      },
     };
   }
 
@@ -980,10 +1076,69 @@ export class ReportGeneratorService {
     parameters: Record<string, any>,
     userId: string,
   ): Promise<any> {
-    // Implementation for timeliness report
+    const { startDate, endDate, ageToleranceDays = 7 } = parameters;
+    const start = startDate ? new Date(startDate) : new Date(new Date().setMonth(new Date().getMonth() - 6));
+    const end = endDate ? new Date(endDate) : new Date();
+
+    // Get vaccination schedules with their actual immunization dates
+    const schedules = await this.prisma.vaccinationSchedule.findMany({
+      where: {
+        dueDate: { gte: start, lte: end },
+      },
+      include: {
+        child: true,
+        vaccine: true,
+      },
+    });
+
+    let onTime = 0;
+    let delayed = 0;
+    let missed = 0;
+    let future = 0;
+
+    const now = new Date();
+    for (const schedule of schedules) {
+      if (schedule.status === 'COMPLETED') {
+        // Check if there was an actual immunization
+        const immunization = await this.prisma.immunization.findFirst({
+          where: {
+            childId: schedule.childId,
+            vaccineId: schedule.vaccineId,
+          },
+        });
+
+        if (immunization) {
+          const daysDiff = Math.floor((new Date(immunization.dateAdministered).getTime() - new Date(schedule.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+          if (Math.abs(daysDiff) <= ageToleranceDays) {
+            onTime++;
+          } else {
+            delayed++;
+          }
+        } else {
+          missed++;
+        }
+      } else if (schedule.status === 'PENDING' || schedule.status === 'SCHEDULED') {
+        if (new Date(schedule.dueDate) > now) {
+          future++;
+        } else {
+          missed++;
+        }
+      }
+    }
+
+    const total = onTime + delayed + missed;
+    const timelinessRate = total > 0 ? Math.round((onTime / total) * 1000) / 10 : 0;
+
     return {
-      message: 'Timeliness report would be generated here',
-      parameters,
+      period: { start: start.toISOString(), end: end.toISOString() },
+      toleranceDays: ageToleranceDays,
+      stats: {
+        onTime,
+        delayed,
+        missed,
+        future,
+        timelinessRate,
+      },
     };
   }
 }

@@ -64,7 +64,7 @@ export class ImmunizationResponseDto {
     },
     description: 'Facility information',
   })
-  facility: {
+  facility?: {
     id: string;
     name: string;
     code: string;
@@ -84,7 +84,7 @@ export class ImmunizationResponseDto {
     },
     description: 'Health worker information',
   })
-  healthWorker: {
+  healthWorker?: {
     id: string;
     fullName: string;
     licenseNumber?: string;

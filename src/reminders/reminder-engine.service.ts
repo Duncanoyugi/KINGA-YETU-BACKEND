@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { ReminderType, ReminderStatus, ImmunizationStatus, Prisma } from '@prisma/client';
+import { ReminderType, ReminderStatus, ImmunizationStatus, ScheduleStatus, Prisma } from '@prisma/client';
 import { CreateReminderDto } from './dto/reminder-request.dto';
 import moment from 'moment';
 
@@ -33,7 +33,7 @@ export class ReminderEngineService {
           gte: startDate,
           lte: endDate,
         },
-        status: ImmunizationStatus.SCHEDULED,
+        status: ScheduleStatus.SCHEDULED,
       };
 
       if (facilityId) {
@@ -212,7 +212,7 @@ export class ReminderEngineService {
           dueDate: {
             lt: new Date(),
           },
-          status: ImmunizationStatus.SCHEDULED,
+          status: ScheduleStatus.SCHEDULED,
         },
         include: {
           child: {
@@ -624,40 +624,43 @@ export class ReminderEngineService {
   }
 
   // Private communication methods
+  // Note: These methods currently log messages. For production, integrate with:
+  // - SMS: Africa's Talking, Twilio, or similar SMS gateway
+  // - Email: SendGrid, AWS SES, or similar email service
+  // - Push: Firebase Cloud Messaging
   private async sendSmsReminder(reminder: any): Promise<void> {
     const parentPhone = reminder.child?.parent?.user?.phoneNumber;
     
     if (!parentPhone) {
-      throw new Error('Parent phone number not found');
+      this.logger.warn(`SMS skipped - no phone number for reminder ${reminder.id}`);
+      return;
     }
 
-    // Integrate with SMS gateway (Africa's Talking, Twilio, etc.)
-    this.logger.log(`SMS sent to ${parentPhone}: ${reminder.message}`);
+    this.logger.log(`[SMS] Would send to ${parentPhone}: ${reminder.message}`);
     
-    // Simulate SMS sending
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // TODO: Integrate with SMS gateway
+    // Example: await this.smsService.send(parentPhone, reminder.message);
   }
 
   private async sendEmailReminder(reminder: any): Promise<void> {
     const parentEmail = reminder.child?.parent?.user?.email;
     
     if (!parentEmail) {
-      throw new Error('Parent email not found');
+      this.logger.warn(`Email skipped - no email for reminder ${reminder.id}`);
+      return;
     }
 
-    // Integrate with email service
-    this.logger.log(`Email sent to ${parentEmail}: ${reminder.message}`);
+    this.logger.log(`[Email] Would send to ${parentEmail}: ${reminder.message}`);
     
-    // Simulate email sending
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // TODO: Integrate with email service
+    // Example: await this.emailService.send(parentEmail, 'Vaccination Reminder', reminder.message);
   }
 
   private async sendPushNotification(reminder: any): Promise<void> {
-    // Integrate with Firebase Cloud Messaging or similar
-    this.logger.log(`Push notification sent: ${reminder.message}`);
+    this.logger.log(`[Push] Would send: ${reminder.message}`);
     
-    // Simulate push notification
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // TODO: Integrate with Firebase Cloud Messaging
+    // Example: await this.fcmService.send(userToken, reminder.message);
   }
 }
 

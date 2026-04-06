@@ -38,17 +38,17 @@ export class ImmunizationsService {
         name: immunization.vaccine.name,
       },
       facilityId: immunization.facilityId,
-      facility: {
+      facility: immunization.facility ? {
         id: immunization.facility.id,
         name: immunization.facility.name,
         code: immunization.facility.code,
-      },
+      } : undefined,
       healthWorkerId: immunization.healthWorkerId,
-      healthWorker: {
+      healthWorker: immunization.healthWorker ? {
         id: immunization.healthWorker.user.id,
         fullName: immunization.healthWorker.user.fullName,
         licenseNumber: immunization.healthWorker.licenseNumber || undefined,
-      },
+      } : undefined,
       dateAdministered: immunization.dateAdministered,
       ageAtDays: immunization.ageAtDays,
       status: immunization.status,
@@ -58,7 +58,7 @@ export class ImmunizationsService {
       administrationSite: immunization.administrationSite || undefined,
       dosage: immunization.dosage || undefined,
       notes: immunization.notes || undefined,
-      hadAdverseReaction: immunization.hadAdverseReaction,
+      hadAdverseReaction: immunization.hadAdverseReaction || false,
       adverseReactionDetails: immunization.adverseReactionDetails || undefined,
       contraindications: immunization.contraindications || undefined,
       administeredBy: immunization.administeredBy || undefined,
