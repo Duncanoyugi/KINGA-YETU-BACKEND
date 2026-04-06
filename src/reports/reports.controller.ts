@@ -66,7 +66,131 @@ export class ReportsController {
   }
 
   // Specific routes must be defined BEFORE parameterized routes
-  // to avoid :id catching keywords like 'coverage'
+  // to avoid :id catching keywords
+
+  @Get('stats/summary')
+  @ApiOperation({ summary: 'Get report generation statistics' })
+  @ApiQuery({ name: 'startDate', required: true, type: Date })
+  @ApiQuery({ name: 'endDate', required: true, type: Date })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  async getReportStatistics(
+    @Query('startDate') startDate: Date,
+    @Query('endDate') endDate: Date,
+    @Query('userId') userId?: string,
+  ) {
+    return this.reportsService.getReportStatistics(new Date(startDate), new Date(endDate), userId);
+  }
+
+  @Get('export/list')
+  @ApiOperation({ summary: 'Export reports list' })
+  @ApiQuery({ name: 'type', required: false, enum: ReportType })
+  @ApiQuery({ name: 'startDate', required: false, type: Date })
+  @ApiQuery({ name: 'endDate', required: false, type: Date })
+  @ApiQuery({ name: 'format', required: false, enum: ['csv', 'excel'] })
+  async exportReportsList(
+    @Query('type') type?: ReportType,
+    @Query('startDate') startDate?: Date,
+    @Query('endDate') endDate?: Date,
+    @Query('format') format: 'csv' | 'excel' = 'csv',
+  ) {
+    return this.reportsService.exportReportsList(
+      { type, startDate, endDate },
+      format,
+    );
+  }
+
+  @Post('cleanup')
+  @ApiOperation({ summary: 'Clean up old reports' })
+  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Delete reports older than X days' })
+  async cleanupOldReports(@Query('days') days: number = 90) {
+    return this.reportsService.cleanupOldReports(days);
+  }
+
+  @Get('types/supported')
+  @ApiOperation({ summary: 'Get supported report types' })
+  getSupportedReportTypes() {
+    return {
+      types: [
+        {
+          type: 'COVERAGE',
+          name: 'Immunization Coverage Report',
+          description: 'Reports on vaccination coverage rates at various levels',
+          parameters: ['startDate', 'endDate', 'county', 'subCounty', 'facilityId'],
+        },
+        {
+          type: 'FACILITY',
+          name: 'Facility Performance Report',
+          description: 'Performance metrics for health facilities',
+          parameters: ['startDate', 'endDate', 'county', 'subCounty', 'facilityIds'],
+        },
+        {
+          type: 'MISSED_VACCINES',
+          name: 'Missed Vaccines Report',
+          description: 'Report on children who missed vaccinations',
+          parameters: ['startDate', 'endDate', 'county', 'subCounty', 'vaccineIds', 'daysOverdue'],
+        },
+        {
+          type: 'DEMOGRAPHIC',
+          name: 'Demographic Distribution Report',
+          description: 'Analysis of immunization by demographic factors',
+          parameters: ['startDate', 'endDate', 'dimension'],
+        },
+        {
+          type: 'TIMELINESS',
+          name: 'Vaccination Timeliness Report',
+          description: 'Analysis of vaccination timeliness',
+          parameters: ['startDate', 'endDate', 'ageToleranceDays'],
+        },
+      ],
+    };
+  }
+
+  @Get('templates/available')
+  @ApiOperation({ summary: 'Get available report templates' })
+  getAvailableTemplates() {
+    return {
+      templates: [
+        {
+          id: 'coverage-national',
+          name: 'National Coverage Report',
+          type: 'COVERAGE',
+          description: 'Standard national immunization coverage report',
+          parameters: {
+            startDate: '2024-01-01',
+            endDate: '2024-12-31',
+            includeComparisons: true,
+            includeFacilityBreakdown: true,
+            includeRecommendations: true,
+          },
+        },
+        {
+          id: 'facility-monthly',
+          name: 'Monthly Facility Performance',
+          type: 'FACILITY',
+          description: 'Monthly performance report for facilities',
+          parameters: {
+            startDate: '2024-01-01',
+            endDate: '2024-01-31',
+            includePerformanceRanking: true,
+            includeGrowthMetrics: true,
+          },
+        },
+        {
+          id: 'missed-vaccines-quarterly',
+          name: 'Quarterly Missed Vaccines',
+          type: 'MISSED_VACCINES',
+          description: 'Quarterly report on missed vaccinations',
+          parameters: {
+            startDate: '2024-01-01',
+            endDate: '2024-03-31',
+            daysOverdue: 30,
+            includeContactInfo: true,
+            includeFollowUpPlan: true,
+          },
+        },
+      ],
+    };
+  }
 
   @Get('coverage')
   @ApiOperation({ summary: 'Get immunization coverage report data' })
@@ -209,129 +333,5 @@ export class ReportsController {
     
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
-  }
-
-  @Get('stats/summary')
-  @ApiOperation({ summary: 'Get report generation statistics' })
-  @ApiQuery({ name: 'startDate', required: true, type: Date })
-  @ApiQuery({ name: 'endDate', required: true, type: Date })
-  @ApiQuery({ name: 'userId', required: false, type: String })
-  async getReportStatistics(
-    @Query('startDate') startDate: Date,
-    @Query('endDate') endDate: Date,
-    @Query('userId') userId?: string,
-  ) {
-    return this.reportsService.getReportStatistics(new Date(startDate), new Date(endDate), userId);
-  }
-
-  @Get('export/list')
-  @ApiOperation({ summary: 'Export reports list' })
-  @ApiQuery({ name: 'type', required: false, enum: ReportType })
-  @ApiQuery({ name: 'startDate', required: false, type: Date })
-  @ApiQuery({ name: 'endDate', required: false, type: Date })
-  @ApiQuery({ name: 'format', required: false, enum: ['csv', 'excel'] })
-  async exportReportsList(
-    @Query('type') type?: ReportType,
-    @Query('startDate') startDate?: Date,
-    @Query('endDate') endDate?: Date,
-    @Query('format') format: 'csv' | 'excel' = 'csv',
-  ) {
-    return this.reportsService.exportReportsList(
-      { type, startDate, endDate },
-      format,
-    );
-  }
-
-  @Post('cleanup')
-  @ApiOperation({ summary: 'Clean up old reports' })
-  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Delete reports older than X days' })
-  async cleanupOldReports(@Query('days') days: number = 90) {
-    return this.reportsService.cleanupOldReports(days);
-  }
-
-  @Get('types/supported')
-  @ApiOperation({ summary: 'Get supported report types' })
-  getSupportedReportTypes() {
-    return {
-      types: [
-        {
-          type: 'COVERAGE',
-          name: 'Immunization Coverage Report',
-          description: 'Reports on vaccination coverage rates at various levels',
-          parameters: ['startDate', 'endDate', 'county', 'subCounty', 'facilityId'],
-        },
-        {
-          type: 'FACILITY',
-          name: 'Facility Performance Report',
-          description: 'Performance metrics for health facilities',
-          parameters: ['startDate', 'endDate', 'county', 'subCounty', 'facilityIds'],
-        },
-        {
-          type: 'MISSED_VACCINES',
-          name: 'Missed Vaccines Report',
-          description: 'Report on children who missed vaccinations',
-          parameters: ['startDate', 'endDate', 'county', 'subCounty', 'vaccineIds', 'daysOverdue'],
-        },
-        {
-          type: 'DEMOGRAPHIC',
-          name: 'Demographic Distribution Report',
-          description: 'Analysis of immunization by demographic factors',
-          parameters: ['startDate', 'endDate', 'dimension'],
-        },
-        {
-          type: 'TIMELINESS',
-          name: 'Vaccination Timeliness Report',
-          description: 'Analysis of vaccination timeliness',
-          parameters: ['startDate', 'endDate', 'ageToleranceDays'],
-        },
-      ],
-    };
-  }
-
-  @Get('templates/available')
-  @ApiOperation({ summary: 'Get available report templates' })
-  getAvailableTemplates() {
-    return {
-      templates: [
-        {
-          id: 'coverage-national',
-          name: 'National Coverage Report',
-          type: 'COVERAGE',
-          description: 'Standard national immunization coverage report',
-          parameters: {
-            startDate: '2024-01-01',
-            endDate: '2024-12-31',
-            includeComparisons: true,
-            includeFacilityBreakdown: true,
-            includeRecommendations: true,
-          },
-        },
-        {
-          id: 'facility-monthly',
-          name: 'Monthly Facility Performance',
-          type: 'FACILITY',
-          description: 'Monthly performance report for facilities',
-          parameters: {
-            startDate: '2024-01-01',
-            endDate: '2024-01-31',
-            includePerformanceRanking: true,
-            includeGrowthMetrics: true,
-          },
-        },
-        {
-          id: 'missed-vaccines-quarterly',
-          name: 'Quarterly Missed Vaccines',
-          type: 'MISSED_VACCINES',
-          description: 'Quarterly report on missed vaccinations',
-          parameters: {
-            startDate: '2024-01-01',
-            endDate: '2024-03-31',
-            daysOverdue: 30,
-            includeContactInfo: true,
-            includeFollowUpPlan: true,
-          },
-        },
-      ],
-    };
   }
 }
