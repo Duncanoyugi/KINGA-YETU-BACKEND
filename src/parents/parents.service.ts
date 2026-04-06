@@ -509,7 +509,11 @@ export class ParentsService {
     const parent = await this.prisma.parent.findUnique({
       where: { id: parentId },
       include: {
-        user: true,
+        user: {
+          include: {
+            profile: true,
+          },
+        },
         children: {
           include: {
             immunizations: true,
@@ -580,6 +584,11 @@ export class ParentsService {
         id: parent.id,
         fullName: parent.user.fullName,
         email: parent.user.email,
+        emergencyContact: parent.emergencyContact || undefined,
+        emergencyPhone: parent.emergencyPhone || undefined,
+        county: parent.user.profile?.county || undefined,
+        subCounty: parent.user.profile?.subCounty || undefined,
+        address: parent.user.profile?.address || undefined,
       },
       children: parent.children.map(child => ({
         id: child.id,
