@@ -18,6 +18,7 @@ export class FacilitiesRepository {
     const where: Prisma.HealthFacilityWhereInput = {};
 
     if (filter?.county) {
+      const normalizedCounty = filter.county.toLowerCase().replace(/[-\s]/g, '');
       where.county = {
         equals: filter.county,
         mode: 'insensitive',
@@ -25,7 +26,10 @@ export class FacilitiesRepository {
     }
 
     if (filter?.subCounty) {
-      where.subCounty = filter.subCounty;
+      where.subCounty = {
+        equals: filter.subCounty,
+        mode: 'insensitive',
+      };
     }
 
     if (filter?.type) {
