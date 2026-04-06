@@ -104,6 +104,23 @@ export class ScheduleResponseDto {
   isEligible: boolean;
 
   @ApiProperty({
+    example: {
+      id: 'clm89djs800s0p29jf4x',
+      name: 'Nairobi Hospital',
+      code: 'NH001',
+      type: 'HOSPITAL',
+    },
+    description: 'Facility information (birth facility)',
+    nullable: true,
+  })
+  facility?: {
+    id: string;
+    name: string;
+    code: string;
+    type: string;
+  } | null;
+
+  @ApiProperty({
     example: '2024-01-01T10:30:00.000Z',
     description: 'Creation timestamp',
   })

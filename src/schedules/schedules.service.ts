@@ -52,6 +52,12 @@ export class SchedulesService {
       isOverdue: daysUntilDue < 0,
       isUpcoming: daysUntilDue >= 0 && daysUntilDue <= 30,
       isEligible: this.isVaccineEligible(schedule.child.dateOfBirth, schedule.vaccine),
+      facility: schedule.child.birthFacility ? {
+        id: schedule.child.birthFacility.id,
+        name: schedule.child.birthFacility.name,
+        code: schedule.child.birthFacility.code,
+        type: schedule.child.birthFacility.type,
+      } : undefined,
       createdAt: schedule.createdAt,
       updatedAt: schedule.updatedAt,
     };
@@ -333,6 +339,14 @@ export class SchedulesService {
               firstName: true,
               lastName: true,
               dateOfBirth: true,
+              birthFacility: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                  type: true,
+                },
+              },
             },
           },
           vaccine: {
@@ -372,6 +386,14 @@ export class SchedulesService {
             firstName: true,
             lastName: true,
             dateOfBirth: true,
+            birthFacility: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                type: true,
+              },
+            },
             parent: {
               select: {
                 user: {
@@ -423,6 +445,14 @@ export class SchedulesService {
             firstName: true,
             lastName: true,
             dateOfBirth: true,
+            birthFacility: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                type: true,
+              },
+            },
           },
         },
         vaccine: {
