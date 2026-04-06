@@ -96,8 +96,12 @@ export class CreateChildDto {
     description: 'Birth facility ID (optional, auto-set from name if provided)',
     required: false,
   })
+  @Transform(({ value }) => {
+    if (value === '' || value === null) return undefined;
+    return value;
+  })
   @IsOptional()
-  @IsUUID('all')
+  @IsString()
   birthFacilityId?: string;
 
   @ApiProperty({

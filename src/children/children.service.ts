@@ -176,7 +176,23 @@ export class ChildrenService {
     }
 
     // Resolve birth facility - if not found, just skip it (don't fail)
-    if (dtoWithParent.birthFacilityName) {
+    // Handle both birthFacilityName (text input) and birthFacilityId (dropdown selection)
+    if (dtoWithParent.birthFacilityId) {
+      // birthFacilityId already provided from dropdown - verify it exists
+      try {
+        const facility = await this.prisma.healthFacility.findUnique({
+          where: { id: dtoWithParent.birthFacilityId }
+        });
+        if (!facility) {
+          this.logger.warn(`Birth facility not found with ID: ${dtoWithParent.birthFacilityId}`);
+          (dtoWithParent as any).birthFacilityId = null;
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to verify birth facility: ${error.message}`);
+        (dtoWithParent as any).birthFacilityId = null;
+      }
+    } else if (dtoWithParent.birthFacilityName) {
+      // Try to resolve facility from name
       try {
         const facility = await this.prisma.healthFacility.findFirst({
           where: {
@@ -190,10 +206,8 @@ export class ChildrenService {
         if (facility) {
           (dtoWithParent as any).birthFacilityId = facility.id;
         }
-        // If facility not found, just continue without setting birthFacilityId
         delete (dtoWithParent as any).birthFacilityName;
       } catch (error) {
-        // If any error occurs during facility lookup, just skip it
         console.warn('Failed to resolve birth facility:', error.message);
         delete (dtoWithParent as any).birthFacilityName;
       }

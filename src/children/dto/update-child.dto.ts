@@ -74,6 +74,6 @@ birthCertificateNo?: string;
     required: false,
   })
   @IsOptional()
-  @IsUUID('all')
+  @IsString()
   birthFacilityId?: string;
 }
