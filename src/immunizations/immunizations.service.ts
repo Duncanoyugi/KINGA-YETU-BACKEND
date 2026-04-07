@@ -79,6 +79,7 @@ export class ImmunizationsService {
   }
 
   async create(recordImmunizationDto: RecordImmunizationDto, userId?: string): Promise<ImmunizationResponseDto> {
+    try {
     // Validate child exists
     const child = await this.prisma.child.findUnique({
       where: { id: recordImmunizationDto.childId },
@@ -119,6 +120,7 @@ export class ImmunizationsService {
     });
 
     if (!healthWorker) {
+      console.error(`Health worker not found: ${recordImmunizationDto.healthWorkerId}`);
       throw new NotFoundException(`Health worker with ID ${recordImmunizationDto.healthWorkerId} not found`);
     }
 
@@ -233,6 +235,10 @@ export class ImmunizationsService {
     });
 
     return this.mapToImmunizationResponseDto(immunization);
+    } catch (error) {
+      console.error('Error creating immunization:', error);
+      throw error;
+    }
   }
 
   private async updateVaccinationSchedule(
