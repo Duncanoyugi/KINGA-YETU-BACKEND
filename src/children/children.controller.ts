@@ -137,11 +137,13 @@ export class ChildrenController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'parentId', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'facilityId', required: false })
   async findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('parentId') parentId?: string,
     @Query('search') search?: string,
+    @Query('facilityId') facilityId?: string,
     @Request() req?: any,
   ): Promise<PaginatedChildrenResponseDto> {
     // If user is a parent, only show their children
@@ -150,7 +152,7 @@ export class ChildrenController {
       parentId = parent;
     }
     
-    return this.childrenService.findAll(page, limit, parentId, search);
+    return this.childrenService.findAll(page, limit, parentId, search, facilityId);
   }
 
   @Get('stats')

@@ -233,6 +233,7 @@ export class ChildrenService {
     limit: number = 10,
     parentId?: string,
     search?: string,
+    facilityId?: string,
   ): Promise<PaginatedChildrenResponseDto> {
     const skip = (page - 1) * limit;
     
@@ -240,6 +241,11 @@ export class ChildrenService {
     
     if (parentId) {
       where.parentId = parentId;
+    }
+
+    // Filter by facility (birth facility)
+    if (facilityId) {
+      where.birthFacilityId = facilityId;
     }
     
     if (search) {

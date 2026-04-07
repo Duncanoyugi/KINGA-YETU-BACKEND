@@ -72,6 +72,7 @@ export class SchedulesController {
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'facilityId', required: false })
   async findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
@@ -83,6 +84,7 @@ export class SchedulesController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('search') search?: string,
+    @Query('facilityId') facilityId?: string,
   ): Promise<PaginatedSchedulesResponseDto> {
     return this.schedulesService.findAll(
       page,
@@ -95,6 +97,7 @@ export class SchedulesController {
       startDate,
       endDate,
       search,
+      facilityId,
     );
   }
 

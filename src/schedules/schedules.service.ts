@@ -272,6 +272,7 @@ export class SchedulesService {
     startDate?: string,
     endDate?: string,
     search?: string,
+    facilityId?: string,
   ): Promise<PaginatedSchedulesResponseDto> {
     const skip = (page - 1) * limit;
     const today = new Date();
@@ -281,6 +282,14 @@ export class SchedulesService {
     if (childId) where.childId = childId;
     if (vaccineId) where.vaccineId = vaccineId;
     if (status) where.status = status;
+
+    // Initialize child filter object
+    const childFilter: any = {};
+    
+    // Filter by facility (via child.birthFacilityId)
+    if (facilityId) {
+      childFilter.birthFacilityId = facilityId;
+    }
 
     // Date range filter
     if (startDate || endDate) {
@@ -345,6 +354,16 @@ export class SchedulesService {
                   name: true,
                   code: true,
                   type: true,
+                },
+              },
+              parent: {
+                select: {
+                  user: {
+                    select: {
+                      fullName: true,
+                      phoneNumber: true,
+                    },
+                  },
                 },
               },
             },
