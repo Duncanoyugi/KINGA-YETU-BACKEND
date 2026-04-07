@@ -4,9 +4,10 @@ import { ImmunizationsController } from './immunizations.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { VaccinesModule } from '../vaccines/vaccines.module';
 import { ChildrenModule } from '../children/children.module';
+import { MailerModule } from '../mailer/mailer.module';
 
 @Module({
-  imports: [PrismaModule, VaccinesModule, ChildrenModule],
+  imports: [PrismaModule, VaccinesModule, ChildrenModule, MailerModule],
   controllers: [ImmunizationsController],
   providers: [ImmunizationsService],
   exports: [ImmunizationsService],

@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { VaccinesService } from '../vaccines/vaccines.service';
 import { ChildrenService } from '../children/children.service';
+import { MailerService } from '../mailer/mailer.service';
 import { RecordImmunizationDto } from './dto/record-immunization.dto';
 import { UpdateImmunizationDto } from './dto/update-immunization.dto';
 import { ImmunizationResponseDto, PaginatedImmunizationsResponseDto, ImmunizationStatsDto } from './dto/immunization-response.dto';
@@ -19,6 +20,7 @@ export class ImmunizationsService {
     private prisma: PrismaService,
     private vaccinesService: VaccinesService,
     private childrenService: ChildrenService,
+    private mailerService: MailerService,
   ) {}
 
   private mapToImmunizationResponseDto(immunization: any): ImmunizationResponseDto {
@@ -76,6 +78,103 @@ export class ImmunizationsService {
     months += today.getMonth();
     
     return months <= 0 ? 0 : months;
+  }
+
+  private formatDisplayDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-KE', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(new Date(date));
+  }
+
+  private async sendVaccinationRecordedEmail(immunization: any): Promise<void> {
+    const parentEmail = immunization.child?.parent?.user?.email;
+
+    if (!parentEmail) {
+      return;
+    }
+
+    const nextScheduledVaccine = await this.prisma.vaccinationSchedule.findFirst({
+      where: {
+        childId: immunization.childId,
+        status: {
+          in: ['PENDING', 'SCHEDULED'],
+        },
+        dueDate: {
+          gt: immunization.dateAdministered,
+        },
+      },
+      include: {
+        vaccine: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        dueDate: 'asc',
+      },
+    });
+
+    const childName = `${immunization.child.firstName} ${immunization.child.lastName}`.trim();
+    const parentName = immunization.child.parent.user.fullName || 'Parent';
+    const vaccineName = immunization.vaccine.name;
+    const facilityName = immunization.facility?.name || 'your health facility';
+    const administeredDate = this.formatDisplayDate(immunization.dateAdministered);
+    const nextVaccineHtml = nextScheduledVaccine
+      ? `
+        <div style="margin-top: 24px; padding: 16px; background: #f3f8f4; border: 1px solid #d8e9db; border-radius: 8px;">
+          <h3 style="margin: 0 0 8px; color: #2d6a4f;">Next scheduled vaccine</h3>
+          <p style="margin: 0; color: #333;">
+            ${nextScheduledVaccine.vaccine.name} is due on <strong>${this.formatDisplayDate(nextScheduledVaccine.dueDate)}</strong>.
+          </p>
+        </div>
+      `
+      : '';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vaccination Recorded</title>
+      </head>
+      <body style="margin: 0; padding: 0; background: #f4f7f5; font-family: Arial, sans-serif; color: #1f2937;">
+        <div style="max-width: 640px; margin: 0 auto; padding: 24px;">
+          <div style="background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
+            <div style="background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%); color: white; padding: 28px 24px;">
+              <h1 style="margin: 0; font-size: 24px;">Vaccination Recorded Successfully</h1>
+            </div>
+            <div style="padding: 24px;">
+              <p style="margin-top: 0;">Hello ${parentName},</p>
+              <p>
+                This is to confirm that <strong>${childName}</strong> has received the
+                <strong>${vaccineName}</strong> vaccine.
+              </p>
+              <div style="margin: 20px 0; padding: 16px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <p style="margin: 0 0 8px;"><strong>Date administered:</strong> ${administeredDate}</p>
+                <p style="margin: 0 0 8px;"><strong>Facility:</strong> ${facilityName}</p>
+                <p style="margin: 0;"><strong>Recorded by:</strong> ${immunization.healthWorker?.user?.fullName || 'Health worker'}</p>
+              </div>
+              ${nextVaccineHtml}
+              <p style="margin-top: 24px;">
+                Please keep this email for your records. If you have any questions, kindly contact your health facility.
+              </p>
+              <p style="margin-bottom: 0;">Best regards,<br><strong>The ImmuniTrack Kenya Team</strong></p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await this.mailerService.sendEmail(
+      parentEmail,
+      `Vaccination Recorded for ${childName}`,
+      html,
+    );
   }
 
   async create(recordImmunizationDto: RecordImmunizationDto, userId?: string): Promise<ImmunizationResponseDto> {
@@ -236,6 +335,16 @@ export class ImmunizationsService {
             firstName: true,
             lastName: true,
             dateOfBirth: true,
+            parent: {
+              select: {
+                user: {
+                  select: {
+                    email: true,
+                    fullName: true,
+                  },
+                },
+              },
+            },
           },
         },
         vaccine: {
@@ -284,6 +393,12 @@ export class ImmunizationsService {
         updatedAt: new Date(),
       },
     });
+
+    try {
+      await this.sendVaccinationRecordedEmail(immunization);
+    } catch (emailError: any) {
+      console.error('[ImmunizationsService] Failed to send vaccination confirmation email:', emailError.message);
+    }
 
     return this.mapToImmunizationResponseDto(immunization);
     } catch (error) {
