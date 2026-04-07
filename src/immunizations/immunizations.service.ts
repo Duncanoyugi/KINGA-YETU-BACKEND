@@ -79,6 +79,11 @@ export class ImmunizationsService {
   }
 
   async create(recordImmunizationDto: RecordImmunizationDto, userId?: string): Promise<ImmunizationResponseDto> {
+    console.log('[ImmunizationsService] Creating immunization for child:', recordImmunizationDto.childId);
+    console.log('[ImmunizationsService] Vaccine ID:', recordImmunizationDto.vaccineId);
+    console.log('[ImmunizationsService] Facility ID:', recordImmunizationDto.facilityId);
+    console.log('[ImmunizationsService] Health Worker ID:', recordImmunizationDto.healthWorkerId);
+    
     try {
     // Validate child exists
     const child = await this.prisma.child.findUnique({
@@ -147,12 +152,15 @@ export class ImmunizationsService {
 
     // Validate vaccine administration age
     const childAgeDays = recordImmunizationDto.ageAtDays;
+    console.log('[ImmunizationsService] Validating vaccine for child age (days):', childAgeDays);
     const validation = await this.vaccinesService.validateVaccineForChild(
       vaccine.code,
       childAgeDays,
     );
+    console.log('[ImmunizationsService] Vaccine validation result:', validation);
 
     if (!validation.isValid) {
+      console.log('[ImmunizationsService] Vaccine validation failed:', validation.message);
       throw new BadRequestException(validation.message);
     }
 

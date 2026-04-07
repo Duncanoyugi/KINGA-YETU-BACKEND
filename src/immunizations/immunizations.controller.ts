@@ -52,7 +52,14 @@ export class ImmunizationsController {
     @Body() recordImmunizationDto: RecordImmunizationDto,
     @Request() req: any,
   ): Promise<ImmunizationResponseDto> {
-    return this.immunizationsService.create(recordImmunizationDto, req.user.id);
+    console.log('[ImmunizationsController] Creating immunization:', JSON.stringify(recordImmunizationDto));
+    console.log('[ImmunizationsController] User ID:', req.user.id);
+    try {
+      return await this.immunizationsService.create(recordImmunizationDto, req.user.id);
+    } catch (error) {
+      console.error('[ImmunizationsController] Error:', error.message);
+      throw error;
+    }
   }
 
   @Get()
