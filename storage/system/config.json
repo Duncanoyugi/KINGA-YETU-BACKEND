@@ -1,0 +1,60 @@
+{
+  "general": {
+    "siteName": "ImmuniTrack Kenya",
+    "siteUrl": "https://immunitrack.ke",
+    "supportEmail": "support@immunitrack.ke",
+    "supportPhone": "+254700123456",
+    "timezone": "Africa/Nairobi",
+    "dateFormat": "MMM dd, yyyy",
+    "timeFormat": "HH:mm",
+    "maintenanceMode": false
+  },
+  "notifications": {
+    "emailEnabled": true,
+    "smsEnabled": true,
+    "pushEnabled": true,
+    "reminderDays": [
+      7,
+      3,
+      1
+    ],
+    "maxReminders": 3,
+    "quietHoursEnabled": true,
+    "quietHoursStart": "22:00",
+    "quietHoursEnd": "06:00"
+  },
+  "security": {
+    "passwordMinLength": 8,
+    "requireUppercase": true,
+    "requireLowercase": true,
+    "requireNumbers": true,
+    "requireSpecialChars": true,
+    "maxLoginAttempts": 5,
+    "lockoutDuration": 30,
+    "sessionTimeout": 60,
+    "twoFactorRequired": false,
+    "ipWhitelistEnabled": false
+  },
+  "data": {
+    "retentionPeriod": 365,
+    "backupEnabled": true,
+    "backupFrequency": "daily",
+    "backupTime": "02:00",
+    "autoExportEnabled": false,
+    "exportFormat": "csv",
+    "dataEncryption": true
+  },
+  "api": {
+    "rateLimit": 100,
+    "rateWindow": 60,
+    "apiTimeout": 30,
+    "maxUploadSize": 10,
+    "allowedFileTypes": [
+      "jpg",
+      "png",
+      "pdf",
+      "csv"
+    ],
+    "apiVersion": "v1"
+  }
+}
