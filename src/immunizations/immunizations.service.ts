@@ -450,43 +450,44 @@ export class ImmunizationsService {
   }
 
   async findByChildId(childId: string): Promise<ImmunizationResponseDto[]> {
-    const immunizations = await this.prisma.immunization.findMany({
-      where: { childId },
-      include: {
-        child: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            dateOfBirth: true,
+    try {
+      const immunizations = await this.prisma.immunization.findMany({
+        where: { childId },
+        include: {
+          child: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              dateOfBirth: true,
+            },
           },
-        },
-        vaccine: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            description: true,
-            recommendedAgeDays: true,
-            administrationRoute: true,
-            dosage: true,
+          vaccine: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              description: true,
+              recommendedAgeDays: true,
+              administrationRoute: true,
+              dosage: true,
+            },
           },
-        },
-        facility: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            type: true,
+          facility: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              type: true,
+            },
           },
-        },
-        healthWorker: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
+          healthWorker: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
               },
             },
           },
@@ -496,6 +497,10 @@ export class ImmunizationsService {
     });
 
     return immunizations.map(immunization => this.mapToImmunizationResponseDto(immunization));
+    } catch (error) {
+      console.error(`Error fetching immunizations for child ${childId}:`, error);
+      throw error;
+    }
   }
 
   async update(
