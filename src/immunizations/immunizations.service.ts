@@ -107,6 +107,7 @@ export class ImmunizationsService {
     });
 
     if (!facility) {
+      console.error(`Facility not found: ${recordImmunizationDto.facilityId}`);
       throw new NotFoundException(`Health facility with ID ${recordImmunizationDto.facilityId} not found`);
     }
 
@@ -246,16 +247,29 @@ export class ImmunizationsService {
     vaccineId: string,
     status: ImmunizationStatus,
   ): Promise<void> {
-    await this.prisma.vaccinationSchedule.updateMany({
-      where: {
-        childId,
-        vaccineId,
-        status: 'SCHEDULED',
-      },
-      data: {
-        status: status === ImmunizationStatus.ADMINISTERED ? 'COMPLETED' : status === ImmunizationStatus.MISSED ? 'MISSED' : status as any,
-      },
-    });
+    let scheduleStatus: string;
+    if (status === ImmunizationStatus.ADMINISTERED) {
+      scheduleStatus = 'COMPLETED';
+    } else if (status === ImmunizationStatus.MISSED) {
+      scheduleStatus = 'MISSED';
+    } else {
+      scheduleStatus = status;
+    }
+
+    try {
+      await this.prisma.vaccinationSchedule.updateMany({
+        where: {
+          childId,
+          vaccineId,
+          status: 'SCHEDULED',
+        },
+        data: {
+          status: scheduleStatus as any,
+        },
+      });
+    } catch (error) {
+      console.error('Error updating vaccination schedule:', error);
+    }
   }
 
   async findAll(
