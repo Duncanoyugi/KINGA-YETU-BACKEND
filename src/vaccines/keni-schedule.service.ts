@@ -466,6 +466,8 @@ export class KenyaScheduleService {
     recommendedAge?: number;
     ageDifference?: number;
   }> {
+    this.logger.log(`[KenyaScheduleService] validateVaccineAdministration called with code: ${vaccineCode}, age: ${childAgeDays}`);
+    
     const vaccine = this.KEPI_SCHEDULE.find(v => v.code === vaccineCode);
     
     if (!vaccine) {

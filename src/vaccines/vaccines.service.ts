@@ -377,7 +377,10 @@ export class VaccinesService {
   }
 
   async validateVaccineForChild(vaccineCode: string, childAgeDays: number) {
-    return this.kenyaScheduleService.validateVaccineAdministration(vaccineCode, childAgeDays);
+    console.log('[VaccinesService] Validating vaccine for child:', vaccineCode, 'age:', childAgeDays);
+    const result = this.kenyaScheduleService.validateVaccineAdministration(vaccineCode, childAgeDays);
+    console.log('[VaccinesService] Validation result:', JSON.stringify(result, null, 2));
+    return result;
   }
 
   async searchVaccines(searchTerm: string) {

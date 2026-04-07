@@ -79,13 +79,13 @@ export class ImmunizationsService {
   }
 
   async create(recordImmunizationDto: RecordImmunizationDto, userId?: string): Promise<ImmunizationResponseDto> {
-    console.log('[ImmunizationsService] Creating immunization for child:', recordImmunizationDto.childId);
-    console.log('[ImmunizationsService] Vaccine ID:', recordImmunizationDto.vaccineId);
-    console.log('[ImmunizationsService] Facility ID:', recordImmunizationDto.facilityId);
-    console.log('[ImmunizationsService] Health Worker ID:', recordImmunizationDto.healthWorkerId);
+    console.log('[ImmunizationsService] === START CREATE IMMUNIZATION ===');
+    console.log('[ImmunizationsService] Full DTO:', JSON.stringify(recordImmunizationDto, null, 2));
+    console.log('[ImmunizationsService] User ID:', userId);
     
     try {
     // Validate child exists
+    console.log('[ImmunizationsService] Step 1: Validating child...');
     const child = await this.prisma.child.findUnique({
       where: { id: recordImmunizationDto.childId },
       include: {
@@ -94,19 +94,25 @@ export class ImmunizationsService {
     });
 
     if (!child) {
+      console.error('[ImmunizationsService] Child not found:', recordImmunizationDto.childId);
       throw new NotFoundException(`Child with ID ${recordImmunizationDto.childId} not found`);
     }
+    console.log('[ImmunizationsService] Child found:', child.firstName, child.lastName);
 
     // Validate vaccine exists
+    console.log('[ImmunizationsService] Step 2: Validating vaccine...');
     const vaccine = await this.prisma.vaccine.findUnique({
       where: { id: recordImmunizationDto.vaccineId },
     });
 
     if (!vaccine) {
+      console.error('[ImmunizationsService] Vaccine not found:', recordImmunizationDto.vaccineId);
       throw new NotFoundException(`Vaccine with ID ${recordImmunizationDto.vaccineId} not found`);
     }
+    console.log('[ImmunizationsService] Vaccine found:', vaccine.code, vaccine.name);
 
     // Validate facility exists
+    console.log('[ImmunizationsService] Step 3: Validating facility...');
     const facility = await this.prisma.healthFacility.findUnique({
       where: { id: recordImmunizationDto.facilityId },
     });
@@ -117,6 +123,7 @@ export class ImmunizationsService {
     }
 
     // Validate health worker exists and belongs to facility
+    console.log('[ImmunizationsService] Step 4: Validating health worker...');
     const healthWorker = await this.prisma.healthWorker.findUnique({
       where: { id: recordImmunizationDto.healthWorkerId },
       include: {
@@ -185,13 +192,42 @@ export class ImmunizationsService {
     );
 
     // Create immunization record
-    const immunization = await this.prisma.immunization.create({
+    console.log('[ImmunizationsService] Step 7: Creating immunization record...');
+    console.log('[ImmunizationsService] Creating with data:', {
+      childId: recordImmunizationDto.childId,
+      vaccineId: recordImmunizationDto.vaccineId,
+      facilityId: recordImmunizationDto.facilityId,
+      healthWorkerId: recordImmunizationDto.healthWorkerId,
+      ageAtDays: recordImmunizationDto.ageAtDays,
+      dateAdministered: recordImmunizationDto.dateAdministered || new Date().toISOString(),
+      status: recordImmunizationDto.status || 'ADMINISTERED',
+      batchNumber: recordImmunizationDto.batchNumber,
+      notes: recordImmunizationDto.notes,
+    });
+    
+    let immunization;
+    try {
+      immunization = await this.prisma.immunization.create({
       data: {
-        ...recordImmunizationDto,
+        childId: recordImmunizationDto.childId,
+        vaccineId: recordImmunizationDto.vaccineId,
+        facilityId: recordImmunizationDto.facilityId,
+        healthWorkerId: recordImmunizationDto.healthWorkerId,
+        ageAtDays: recordImmunizationDto.ageAtDays,
         dateAdministered: recordImmunizationDto.dateAdministered 
           ? new Date(recordImmunizationDto.dateAdministered)
           : new Date(),
-        status: recordImmunizationDto.status || ImmunizationStatus.ADMINISTERED,
+        status: (recordImmunizationDto.status || ImmunizationStatus.ADMINISTERED) as ImmunizationStatus,
+        batchNumber: recordImmunizationDto.batchNumber,
+        expirationDate: recordImmunizationDto.expirationDate ? new Date(recordImmunizationDto.expirationDate) : undefined,
+        manufacturer: recordImmunizationDto.manufacturer,
+        administrationSite: recordImmunizationDto.administrationSite,
+        dosage: recordImmunizationDto.dosage,
+        notes: recordImmunizationDto.notes,
+        hadAdverseReaction: recordImmunizationDto.hadAdverseReaction,
+        adverseReactionDetails: recordImmunizationDto.adverseReactionDetails,
+        contraindications: recordImmunizationDto.contraindications,
+        administeredBy: recordImmunizationDto.administeredBy,
       },
       include: {
         child: {
@@ -234,6 +270,12 @@ export class ImmunizationsService {
         },
       },
     });
+    console.log('[ImmunizationsService] Immunization created successfully:', immunization.id);
+    } catch (createError: any) {
+      console.error('[ImmunizationsService] Error creating immunization record:', createError.message);
+      console.error('[ImmunizationsService] Create error details:', createError);
+      throw new Error(`Failed to create immunization: ${createError.message}`);
+    }
 
     // Update child's last immunization date
     await this.prisma.child.update({

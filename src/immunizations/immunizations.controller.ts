@@ -52,12 +52,16 @@ export class ImmunizationsController {
     @Body() recordImmunizationDto: RecordImmunizationDto,
     @Request() req: any,
   ): Promise<ImmunizationResponseDto> {
-    console.log('[ImmunizationsController] Creating immunization:', JSON.stringify(recordImmunizationDto));
+    console.log('[ImmunizationsController] === START CONTROLLER ===');
+    console.log('[ImmunizationsController] Creating immunization:', JSON.stringify(recordImmunizationDto, null, 2));
     console.log('[ImmunizationsController] User ID:', req.user.id);
     try {
-      return await this.immunizationsService.create(recordImmunizationDto, req.user.id);
+      const result = await this.immunizationsService.create(recordImmunizationDto, req.user.id);
+      console.log('[ImmunizationsController] Success, returning result');
+      return result;
     } catch (error) {
-      console.error('[ImmunizationsController] Error:', error.message);
+      console.error('[ImmunizationsController] Error caught:', error.message);
+      console.error('[ImmunizationsController] Stack:', error.stack);
       throw error;
     }
   }
