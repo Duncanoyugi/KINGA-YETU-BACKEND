@@ -183,6 +183,14 @@ export class ChildrenController {
     return this.childrenService.searchChildren(term);
   }
 
+  @Get(':id/dashboard')
+  @ApiOperation({ summary: 'Get child dashboard with vaccinations and growth records' })
+  @ApiResponse({ status: 200, description: 'Child dashboard data' })
+  @ApiParam({ name: 'id', description: 'Child ID' })
+  async getDashboard(@Param('id') id: string) {
+    return this.childrenService.getChildDashboard(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a child by ID' })
   @ApiResponse({
@@ -194,14 +202,6 @@ export class ChildrenController {
   @ApiParam({ name: 'id', description: 'Child ID' })
   async findOne(@Param('id') id: string): Promise<ChildResponseDto> {
     return this.childrenService.findOne(id);
-  }
-
-  @Get(':id/dashboard')
-  @ApiOperation({ summary: 'Get child dashboard with vaccinations and growth records' })
-  @ApiResponse({ status: 200, description: 'Child dashboard data' })
-  @ApiParam({ name: 'id', description: 'Child ID' })
-  async getDashboard(@Param('id') id: string) {
-    return this.childrenService.getChildDashboard(id);
   }
 
   @Get('certificate/:birthCertificateNo')
