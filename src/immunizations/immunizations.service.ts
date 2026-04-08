@@ -256,13 +256,30 @@ export class ImmunizationsService {
       }
     }
 
-    // Validate vaccine administration age
+    // Validate vaccine administration age using vaccine's own age constraints (not KEPI schedule)
     const childAgeDays = recordImmunizationDto.ageAtDays;
     console.log('[ImmunizationsService] Validating vaccine for child age (days):', childAgeDays);
-    const validation = await this.vaccinesService.validateVaccineForChild(
-      vaccine.code,
-      childAgeDays,
-    );
+    console.log('[ImmunizationsService] Vaccine:', vaccine.code, vaccine.name);
+    console.log('[ImmunizationsService] Vaccine minAgeDays:', vaccine.minAgeDays, 'maxAgeDays:', vaccine.maxAgeDays);
+    
+    // Use the vaccine's own min/max age from database instead of KEPI schedule codes
+    // If vaccine doesn't have age constraints, allow it (some vaccines may not have strict age limits)
+    const minAge = vaccine.minAgeDays ?? 0;
+    const maxAge = vaccine.maxAgeDays ?? Infinity;
+    
+    let validation = { isValid: true, message: 'Valid' };
+    if (minAge > 0 && childAgeDays < minAge) {
+      validation = {
+        isValid: false,
+        message: `Child is too young for this vaccine. Minimum age: ${minAge} days`,
+      };
+    } else if (maxAge !== Infinity && childAgeDays > maxAge) {
+      validation = {
+        isValid: false,
+        message: `Child is too old for this vaccine. Maximum age: ${maxAge} days`,
+      };
+    }
+    
     console.log('[ImmunizationsService] Vaccine validation result:', validation);
 
     if (!validation.isValid) {
