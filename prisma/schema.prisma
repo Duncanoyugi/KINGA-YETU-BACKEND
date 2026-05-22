@@ -524,3 +524,60 @@ model Report {
   @@index([userId])
   @@map("reports")
 }
+
+model AgentTrace {
+  id           String   @id @default(cuid())
+  agentName    String   // e.g. "Root Orchestrator", "Forecasting Agent", etc.
+  runId        String   // grouped execution ID
+  parentSpanId String?
+  spanId       String
+  stepName     String   // e.g. "Vaccine Stock Forecasting", "Outbreak Assessment"
+  stepType     String   // e.g. "THOUGHT", "TOOL_CALL", "MODEL_CALL", "ACTION"
+  input        String   // JSON string
+  output       String   // JSON string
+  thoughts     String?  @db.Text // LLM reasoning
+  latencyMs    Int
+  tokensUsed   Int      @default(0)
+  status       String   // "SUCCESS", "FAILED"
+  createdAt    DateTime @default(now())
+
+  @@index([runId])
+  @@index([agentName])
+  @@map("agent_traces")
+}
+
+model AgentCampaign {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  targetGroup  String   // e.g. "Missed BCG vaccination in Ward X"
+  channel      String   // "SMS", "EMAIL", "PUSH"
+  messageTemplate String
+  status       String   // "DRAFT", "PENDING_APPROVAL", "RUNNING", "COMPLETED"
+  totalTargeted Int     @default(0)
+  totalResponded Int    @default(0)
+  responseRate Float    @default(0.0)
+  aiOptimized  Boolean  @default(false)
+  feedbackDetails String? @db.Text // JSON string
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("agent_campaigns")
+}
+
+model OutbreakAlert {
+  id           String   @id @default(cuid())
+  disease      String   // e.g. "Measles", "Cholera", "Polio"
+  region       String   // County/Subcounty/Ward
+  riskScore    Int
+  riskLevel    String   // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  symptoms     String   // comma-separated symptoms or JSON
+  findings     String   @db.Text // Agent's reasoning
+  recommendedActions String @db.Text // JSON or bulleted actions
+  status       String   // "ACTIVE", "RESOLVED", "DISMISSED"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("outbreak_alerts")
+}
+

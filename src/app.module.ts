@@ -18,6 +18,7 @@ import { MailerModule } from './mailer/mailer.module';
 import { OtpModule } from './otp/otp.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { SystemModule } from './system/system.module';
+import { AgentsModule } from './agents/agents.module';
 
 @Module({
   imports: [
@@ -41,8 +42,10 @@ import { SystemModule } from './system/system.module';
     OtpModule,
     FacilitiesModule,
     SystemModule,
+    AgentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+
