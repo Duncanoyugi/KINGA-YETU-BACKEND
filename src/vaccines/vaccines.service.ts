@@ -334,25 +334,36 @@ export class VaccinesService {
       birthDoseVaccines,
       boosterVaccines,
       totalAdministrations,
-      topAdministered,
     ] = await Promise.all([
       this.prisma.vaccine.count(),
       this.prisma.vaccine.count({ where: { isActive: true } }),
       this.prisma.vaccine.count({ where: { isBirthDose: true } }),
       this.prisma.vaccine.count({ where: { isBooster: true } }),
       this.prisma.immunization.count(),
-      this.prisma.$queryRaw`
-        SELECT 
-          v.name as vaccineName,
-          v.code as vaccineCode,
-          COUNT(i.id) as count
-        FROM vaccines v
-        LEFT JOIN immunizations i ON v.id = i."vaccineId"
-        GROUP BY v.id, v.name, v.code
-        ORDER BY count DESC
-        LIMIT 10
-      `,
     ]);
+
+    // Use Prisma query instead of raw SQL for better reliability
+    const topAdministeredRaw = await this.prisma.immunization.groupBy({
+      by: ['vaccineId'],
+      _count: { vaccineId: true },
+      orderBy: { _count: { vaccineId: 'desc' } },
+      take: 10,
+    });
+
+    const vaccineIds = topAdministeredRaw.map(item => item.vaccineId);
+    const vaccines = await this.prisma.vaccine.findMany({
+      where: { id: { in: vaccineIds } },
+      select: { id: true, name: true, code: true },
+    });
+
+    const topAdministered = topAdministeredRaw.map(item => {
+      const vaccine = vaccines.find(v => v.id === item.vaccineId);
+      return {
+        vaccineName: vaccine?.name || 'Unknown',
+        vaccineCode: vaccine?.code || 'UNK',
+        count: item._count.vaccineId,
+      };
+    });
 
     return {
       totalVaccines,
@@ -360,7 +371,7 @@ export class VaccinesService {
       birthDoseVaccines,
       boosterVaccines,
       totalAdministrations,
-      topAdministered: topAdministered as any,
+      topAdministered,
     };
   }
 
