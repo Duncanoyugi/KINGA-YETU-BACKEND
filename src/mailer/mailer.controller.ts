@@ -24,7 +24,7 @@ export class MailerController {
       );
       return { 
         success: true, 
-        message: 'Test email sent successfully. Check your Mailtrap inbox.' 
+        message: 'Test email sent successfully. Check the recipient inbox.' 
       };
     } catch (error) {
       return { 

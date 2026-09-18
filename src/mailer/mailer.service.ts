@@ -1,40 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class MailerService {
   private readonly logger = new Logger(MailerService.name);
-  private transporter: nodemailer.Transporter;
+  private readonly resend: Resend | null;
 
   constructor(private configService: ConfigService) {
-    this.initializeTransporter();
-  }
-
-  private initializeTransporter() {
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get('SMTP_HOST'),
-      port: Number(this.configService.get('SMTP_PORT')),
-      secure: this.configService.get('SMTP_SECURE') === 'true',
-      auth: {
-        user: this.configService.get('SMTP_USER'),
-        pass: this.configService.get('SMTP_PASS'),
-      },
-      // Mailtrap doesn't require TLS, but we'll keep it as is
-      requireTLS: false,
-      connectionTimeout: 10000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
-    });
-
-    // Verify connection
-    this.transporter.verify((error, success) => {
-      if (error) {
-        this.logger.error(`Mailtrap SMTP connection failed: ${error.message}`);
-      } else {
-        this.logger.log('Mailtrap SMTP server is ready to take messages');
-      }
-    });
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    this.resend = apiKey ? new Resend(apiKey) : null;
   }
 
   async sendEmail(to: string, subject: string, html: string) {
@@ -44,19 +19,33 @@ export class MailerService {
       return null;
     }
 
+    if (!this.resend) {
+      const error = new Error('RESEND_API_KEY is not configured');
+      this.logger.error(error.message);
+      throw error;
+    }
+
     try {
-      const mailOptions = {
-        from: `"ImmuniTrack Kenya" <${this.configService.get('SMTP_FROM')}>`,
-        to,
+      const { data, error } = await this.resend.emails.send({
+        from: this.configService.get<string>(
+          'MAIL_FROM',
+          'Kinga Yetu ImmuniTrack <onboarding@resend.dev>',
+        ),
+        to: [to],
         subject,
         html,
-      };
+      });
 
-      const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Email sent: ${info.messageId}`);
-      return info;
+      if (error) {
+        this.logger.error(`Resend failed to send email: ${error.message}`);
+        throw new Error(error.message);
+      }
+
+      this.logger.log(`Email sent: ${data?.id}`);
+      return { messageId: data?.id };
     } catch (error) {
-      this.logger.error(`Failed to send email: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to send email: ${message}`);
       throw error;
     }
   }

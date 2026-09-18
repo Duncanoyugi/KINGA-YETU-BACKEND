@@ -322,7 +322,7 @@ Updates vaccination schedule status
 **Purpose:** Sends notifications through various channels.
 
 **Providers:**
-- `EmailProvider` - Sends emails (via Mailtrap/SMTP)
+- `EmailProvider` - Sends emails via the Resend API
 - `SmsProvider` - Sends SMS (via Africa's Talking)
 - `PushProvider` - Sends push notifications
 
@@ -393,7 +393,7 @@ Updates vaccination schedule status
 
 **Purpose:** Handles email sending.
 
-**Uses:** Mailtrap for development, can be configured for production email services (SendGrid, AWS SES, etc.)
+**Uses:** Resend for email delivery through its HTTPS API.
 
 ---
 
