@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleCalculatorService } from './schedule-calculator.service';
@@ -273,6 +274,7 @@ export class SchedulesService {
     endDate?: string,
     search?: string,
     facilityId?: string,
+    requester?: { id: string; role: string },
   ): Promise<PaginatedSchedulesResponseDto> {
     const skip = (page - 1) * limit;
     const today = new Date();
@@ -289,6 +291,26 @@ export class SchedulesService {
     // Filter by facility (via child.birthFacilityId)
     if (facilityId) {
       childFilter.birthFacilityId = facilityId;
+    }
+
+    // Same bulk-enumeration gap fixed in ImmunizationsService.findAll and
+    // ChildrenController.findAll: with no filters, `where` stayed
+    // completely empty, so ANY authenticated role — including PARENT —
+    // could page through every child's vaccination schedule in the whole
+    // system. PARENT is now excluded at the controller/@Roles() level;
+    // HEALTH_WORKER is confined here to their own facility.
+    if (requester?.role === 'HEALTH_WORKER') {
+      const healthWorker = await this.prisma.healthWorker.findUnique({
+        where: { userId: requester.id },
+        select: { facilityId: true },
+      });
+      if (!healthWorker?.facilityId) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      if (facilityId && facilityId !== healthWorker.facilityId) {
+        throw new ForbiddenException("You can only view schedules for your own facility's children");
+      }
+      childFilter.birthFacilityId = healthWorker.facilityId;
     }
 
     // Date range filter
@@ -336,11 +358,17 @@ export class SchedulesService {
     }
 
     const [total, schedules] = await Promise.all([
-      this.prisma.vaccinationSchedule.count({ where }),
+      this.prisma.vaccinationSchedule.count({ where: { ...where, ...(Object.keys(childFilter).length ? { child: childFilter } : {}) } }),
       this.prisma.vaccinationSchedule.findMany({
         skip,
         take: limit,
-        where,
+        // `childFilter` (the birthFacilityId scoping built above) was
+        // previously built up but never actually merged into `where` —
+        // a facility filter that silently did nothing, for anyone who
+        // passed one. Fixed here so both the pre-existing `facilityId`
+        // query param and the new health-worker facility restriction
+        // above actually take effect.
+        where: { ...where, ...(Object.keys(childFilter).length ? { child: childFilter } : {}) },
         include: {
           child: {
             select: {
@@ -395,7 +423,7 @@ export class SchedulesService {
     };
   }
 
-  async findOne(id: string): Promise<ScheduleResponseDto> {
+  async findOne(id: string, userId?: string): Promise<ScheduleResponseDto> {
     const schedule = await this.prisma.vaccinationSchedule.findUnique({
       where: { id },
       include: {
@@ -451,10 +479,51 @@ export class SchedulesService {
       throw new NotFoundException(`Schedule with ID ${id} not found`);
     }
 
+    // Same IDOR gap found across ChildrenService/ImmunizationsService — a
+    // vaccination schedule reveals which vaccines a specific child is due
+    // for and when, and had no ownership check at all.
+    await this.assertCanAccessSchedule(schedule, userId);
+
     return this.mapToScheduleResponseDto(schedule);
   }
 
-  async findByChildId(childId: string): Promise<ScheduleResponseDto[]> {
+  /** Mirrors ChildrenService.assertCanAccessChild / ImmunizationsService.assertCanAccessImmunization. */
+  private async assertCanAccessSchedule(
+    schedule: { child?: { parent?: { user?: { id: string } | null } | null } | null },
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) return;
+    const ownerUserId = schedule.child?.parent?.user?.id;
+    if (ownerUserId && ownerUserId !== userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'].includes(user.role)) {
+        throw new ForbiddenException('You are not authorized to view this schedule');
+      }
+    }
+  }
+
+  /** Same check as assertCanAccessSchedule, starting from a parentId rather than an already-loaded schedule/child. */
+  private async assertCanAccessChildById(parentId: string, userId: string): Promise<void> {
+    const parent = await this.prisma.parent.findUnique({ where: { id: parentId }, select: { userId: true } });
+    if (parent && parent.userId !== userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'].includes(user.role)) {
+        throw new ForbiddenException('You are not authorized to view this child\'s schedules');
+      }
+    }
+  }
+
+  async findByChildId(childId: string, userId?: string): Promise<ScheduleResponseDto[]> {
+    // Same IDOR gap as findOne() above, for the "all schedules for this
+    // child" list view.
+    if (userId) {
+      const child = await this.prisma.child.findUnique({ where: { id: childId }, select: { parentId: true } });
+      if (!child) {
+        throw new NotFoundException(`Child with ID ${childId} not found`);
+      }
+      await this.assertCanAccessChildById(child.parentId, userId);
+    }
+
     const schedules = await this.prisma.vaccinationSchedule.findMany({
       where: { childId },
       include: {

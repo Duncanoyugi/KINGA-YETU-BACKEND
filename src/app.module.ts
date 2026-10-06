@@ -1,5 +1,7 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,13 +21,26 @@ import { OtpModule } from './otp/otp.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { SystemModule } from './system/system.module';
 import { AgentsModule } from './agents/agents.module';
+import { validateEnv } from './common/config/env.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
+    // Global request-rate limiting. Per-route limits (e.g. tighter ones
+    // on /auth/login, /auth/register, /otp/*) are layered on top with
+    // the @Throttle() decorator on those controllers — see
+    // auth.controller.ts and otp.controller.ts.
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000, // 1 minute
+        limit: 120, // 120 requests / minute / IP across the whole API
+      },
+    ]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -45,7 +60,12 @@ import { AgentsModule } from './agents/agents.module';
     AgentsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
-

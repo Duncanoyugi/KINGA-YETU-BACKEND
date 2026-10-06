@@ -16,6 +16,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -39,7 +40,7 @@ import { PrismaService } from '../prisma/prisma.service';
 @ApiTags('children')
 @Controller('children')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ChildrenController {
   private readonly logger = new Logger(ChildrenController.name);
   
@@ -151,6 +152,25 @@ export class ChildrenController {
       const parent = await this.getParentIdFromUser(req.user.id);
       parentId = parent;
     }
+
+    // Previously a HEALTH_WORKER (or anyone else, since this route has
+    // no @Roles() restriction) could pass any facilityId — or none at
+    // all, returning every child in the system — with nothing checking
+    // it was actually their own facility. Scoped the same way PARENT
+    // already was above.
+    if (req?.user?.role === UserRole.HEALTH_WORKER) {
+      const healthWorker = await this.prisma.healthWorker.findUnique({
+        where: { userId: req.user.id },
+        select: { facilityId: true },
+      });
+      if (!healthWorker?.facilityId) {
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      if (facilityId && facilityId !== healthWorker.facilityId) {
+        throw new ForbiddenException("You can only view children at your own facility");
+      }
+      facilityId = healthWorker.facilityId;
+    }
     
     return this.childrenService.findAll(page, limit, parentId, search, facilityId);
   }
@@ -189,8 +209,8 @@ export class ChildrenController {
   @ApiOperation({ summary: 'Get child dashboard with vaccinations and growth records' })
   @ApiResponse({ status: 200, description: 'Child dashboard data' })
   @ApiParam({ name: 'id', description: 'Child ID' })
-  async getDashboard(@Param('id') id: string) {
-    return this.childrenService.getChildDashboard(id);
+  async getDashboard(@Param('id') id: string, @Request() req: any) {
+    return this.childrenService.getChildDashboard(id, req.user.id);
   }
 
   @Get(':id')
@@ -202,8 +222,8 @@ export class ChildrenController {
   })
   @ApiResponse({ status: 404, description: 'Child not found' })
   @ApiParam({ name: 'id', description: 'Child ID' })
-  async findOne(@Param('id') id: string): Promise<ChildResponseDto> {
-    return this.childrenService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req: any): Promise<ChildResponseDto> {
+    return this.childrenService.findOne(id, req.user.id);
   }
 
   @Get('certificate/:birthCertificateNo')

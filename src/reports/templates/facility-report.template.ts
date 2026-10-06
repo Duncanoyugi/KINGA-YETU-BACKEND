@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
+import { escapeHtml, safeJsonForScript } from '../utils/html-escape.util';
 
 export interface FacilityReportData {
   facilityName: string;
@@ -47,7 +48,7 @@ export class FacilityReportTemplate {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${data.facilityName} Performance Report</title>
+        <title>${escapeHtml(data.facilityName)} Performance Report</title>
         <style>
           body { 
             font-family: 'Arial', sans-serif; 
@@ -171,9 +172,9 @@ export class FacilityReportTemplate {
         <div class="report-container">
           <!-- Header -->
           <div class="header">
-            <h1 class="facility-title">${data.facilityName}</h1>
-            <div class="facility-subtitle">${data.county} County, ${data.subCounty} Sub-County</div>
-            <div>Performance Report for ${data.period}</div>
+            <h1 class="facility-title">${escapeHtml(data.facilityName)}</h1>
+            <div class="facility-subtitle">${escapeHtml(data.county)} County, ${escapeHtml(data.subCounty)} Sub-County</div>
+            <div>Performance Report for ${escapeHtml(data.period)}</div>
             ${data.ranking ? `
               <div style="margin-top: 10px;">
                 <strong>Ranking:</strong> 
@@ -247,7 +248,7 @@ export class FacilityReportTemplate {
                 
                 return `
                   <tr>
-                    <td>${trend.month}</td>
+                    <td>${escapeHtml(trend.month)}</td>
                     <td>${trend.immunizations.toLocaleString()}</td>
                     <td>${trend.coverage.toFixed(1)}%</td>
                     <td style="color: ${trendColor}; font-weight: bold;">
@@ -274,7 +275,7 @@ export class FacilityReportTemplate {
             <tbody>
               ${data.vaccineBreakdown.map(vaccine => `
                 <tr>
-                  <td>${vaccine.vaccineName}</td>
+                  <td>${escapeHtml(vaccine.vaccineName)}</td>
                   <td>${vaccine.count.toLocaleString()}</td>
                   <td>${vaccine.percentage.toFixed(1)}%</td>
                 </tr>
@@ -296,14 +297,14 @@ export class FacilityReportTemplate {
           <div class="recommendations">
             <h3>Recommendations for Improvement</h3>
             <ul style="margin: 10px 0; padding-left: 20px;">
-              ${data.recommendations.map(rec => `<li style="margin-bottom: 8px;">${rec}</li>`).join('')}
+              ${data.recommendations.map(rec => `<li style="margin-bottom: 8px;">${escapeHtml(rec)}</li>`).join('')}
             </ul>
           </div>
 
           <!-- Footer -->
           <div class="footer">
-            <div>ImmuniTrack Kenya - Ministry of Health</div>
-            <div>Facility Performance Report - ${data.facilityName}</div>
+            <div>Kinga Yetu - Ministry of Health</div>
+            <div>Facility Performance Report - ${escapeHtml(data.facilityName)}</div>
             <div>Report generated on: ${new Date(data.generatedAt).toLocaleString('en-KE')}</div>
             <div class="no-print">
               <button onclick="window.print()" style="background: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px;">
@@ -317,9 +318,9 @@ export class FacilityReportTemplate {
         <script>
           document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('trendChart').getContext('2d');
-            const months = ${JSON.stringify(data.monthlyTrends.map(t => t.month))};
-            const immunizations = ${JSON.stringify(data.monthlyTrends.map(t => t.immunizations))};
-            const coverage = ${JSON.stringify(data.monthlyTrends.map(t => t.coverage))};
+            const months = ${safeJsonForScript(data.monthlyTrends.map(t => t.month))};
+            const immunizations = ${safeJsonForScript(data.monthlyTrends.map(t => t.immunizations))};
+            const coverage = ${safeJsonForScript(data.monthlyTrends.map(t => t.coverage))};
 
             new Chart(ctx, {
               type: 'line',

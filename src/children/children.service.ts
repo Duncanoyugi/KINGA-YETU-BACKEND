@@ -21,6 +21,41 @@ export class ChildrenService {
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * Shared ownership check for a single child record: the child's own
+   * parent always has access; the given `allowedRoles` may access any
+   * child regardless of ownership (e.g. clinical staff). Throws
+   * ForbiddenException otherwise. `userId` is optional only because some
+   * call sites (e.g. internal/system calls) don't have a request user —
+   * when omitted, the check is skipped entirely, same as the pre-existing
+   * behaviour on update()/remove().
+   *
+   * Public (not private) so sibling services that hold a child-scoped
+   * record (immunizations, schedules, growth records, ...) can reuse the
+   * exact same access policy instead of re-implementing it — see
+   * ImmunizationsService.findByChildId for an example.
+   */
+  async assertCanAccessChild(
+    child: { parentId: string },
+    userId: string | undefined,
+    action: 'view' | 'update' | 'delete',
+    allowedRoles: Array<'ADMIN' | 'SUPER_ADMIN' | 'HEALTH_WORKER'> = ['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'],
+  ): Promise<void> {
+    if (!userId) return;
+
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: child.parentId },
+      select: { userId: true },
+    });
+
+    if (parent && userId !== parent.userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !allowedRoles.includes(user.role as any)) {
+        throw new ForbiddenException(`You are not authorized to ${action} this child`);
+      }
+    }
+  }
+
   private mapToChildResponseDto(child: any): ChildResponseDto {
     const fullName = child.middleName 
       ? `${child.firstName} ${child.middleName} ${child.lastName}`
@@ -273,8 +308,17 @@ export class ChildrenService {
     };
   }
 
-  async findOne(id: string): Promise<ChildResponseDto> {
+  async findOne(id: string, userId?: string): Promise<ChildResponseDto> {
     const child = await this.childrenRepository.findOne(id);
+    if (!child) {
+      throw new NotFoundException(`Child with ID ${id} not found`);
+    }
+    // Previously unauthenticated-ownership-wise: any logged-in user of any
+    // role could fetch any child's full record (name, DOB, birth
+    // certificate number) just by knowing/guessing the ID — the classic
+    // IDOR pattern. Applies the same access rule already used by
+    // update()/remove() below.
+    await this.assertCanAccessChild(child, userId, 'view');
     return this.mapToChildResponseDto(child);
   }
 
@@ -283,11 +327,14 @@ export class ChildrenService {
     return children.map(child => this.mapToChildResponseDto(child));
   }
 
-  async getChildDashboard(childId: string) {
+  async getChildDashboard(childId: string, userId?: string) {
     const child = await this.childrenRepository.findOne(childId);
     if (!child) {
       throw new NotFoundException(`Child with ID ${childId} not found`);
     }
+    // Same IDOR gap as findOne() above — a dashboard exposes even more
+    // (upcoming vaccinations, growth history), so this needs the same check.
+    await this.assertCanAccessChild(child, userId, 'view');
 
     // Get upcoming vaccinations
     const upcomingSchedules = await this.prisma.vaccinationSchedule.findMany({
@@ -350,23 +397,7 @@ export class ChildrenService {
     }
 
     // Check authorization - get the parent to compare with userId
-    if (userId) {
-      const parent = await this.prisma.parent.findUnique({
-        where: { id: existingChild.parentId },
-        select: { userId: true },
-      });
-      
-      // FIX: Compare userId with parent.userId, not parent.id
-      if (parent && userId !== parent.userId) {
-        const user = await this.prisma.user.findUnique({
-          where: { id: userId },
-        });
-
-        if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'HEALTH_WORKER') {
-          throw new ForbiddenException('You are not authorized to update this child');
-        }
-      }
-    }
+    await this.assertCanAccessChild(existingChild, userId, 'update');
 
 // Resolve birth facility by name if provided (update)
     if (updateChildDto.birthFacilityName !== undefined) {
@@ -418,23 +449,7 @@ export class ChildrenService {
     }
 
     // Check authorization - get the parent to compare with userId
-    if (userId) {
-      const parent = await this.prisma.parent.findUnique({
-        where: { id: child.parentId },
-        select: { userId: true },
-      });
-      
-      // FIX: Compare userId with parent.userId, not parent.id
-      if (parent && userId !== parent.userId) {
-        const user = await this.prisma.user.findUnique({
-          where: { id: userId },
-        });
-
-        if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
-          throw new ForbiddenException('You are not authorized to delete this child');
-        }
-      }
-    }
+    await this.assertCanAccessChild(child, userId, 'delete', ['ADMIN', 'SUPER_ADMIN']);
 
     // Check if child has any immunizations or other records
     const hasRecords = await this.prisma.immunization.count({

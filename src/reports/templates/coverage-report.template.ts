@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
+import { escapeHtml } from '../utils/html-escape.util';
 
 export interface CoverageReportData {
   title: string;
@@ -49,7 +50,7 @@ export class CoverageReportTemplate {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${data.title}</title>
+        <title>${escapeHtml(data.title)}</title>
         <style>
           body { 
             font-family: 'Arial', sans-serif; 
@@ -197,8 +198,8 @@ export class CoverageReportTemplate {
           <!-- Header -->
           <div class="header">
             <img src="{{ministryLogo}}" alt="Ministry of Health Logo" class="ministry-logo">
-            <h1 class="report-title">${data.title}</h1>
-            <div class="report-period">${data.period}</div>
+            <h1 class="report-title">${escapeHtml(data.title)}</h1>
+            <div class="report-period">${escapeHtml(data.period)}</div>
             <div>Generated on: ${new Date(data.generatedAt).toLocaleDateString('en-KE')}</div>
           </div>
 
@@ -256,7 +257,7 @@ export class CoverageReportTemplate {
             <tbody>
               ${data.byCounty.map(county => `
                 <tr>
-                  <td>${county.county}</td>
+                  <td>${escapeHtml(county.county)}</td>
                   <td>${county.children.toLocaleString()}</td>
                   <td>${county.vaccinated.toLocaleString()}</td>
                   <td class="coverage-cell" style="color: ${county.coverage >= 90 ? '#4CAF50' : county.coverage >= 80 ? '#FFC107' : county.coverage >= 70 ? '#FF9800' : '#F44336'}">
@@ -284,7 +285,7 @@ export class CoverageReportTemplate {
               <tbody>
                 ${data.byFacility.slice(0, 10).map(facility => `
                   <tr>
-                    <td>${facility.facilityName}</td>
+                    <td>${escapeHtml(facility.facilityName)}</td>
                     <td>${facility.children.toLocaleString()}</td>
                     <td>${facility.vaccinated.toLocaleString()}</td>
                     <td class="coverage-cell" style="color: ${facility.coverage >= 90 ? '#4CAF50' : facility.coverage >= 80 ? '#FFC107' : facility.coverage >= 70 ? '#FF9800' : '#F44336'}">
@@ -301,16 +302,16 @@ export class CoverageReportTemplate {
             <div class="recommendations">
               <h3>Recommendations</h3>
               <ul style="margin: 10px 0; padding-left: 20px;">
-                ${data.recommendations.map(rec => `<li style="margin-bottom: 8px;">${rec}</li>`).join('')}
+                ${data.recommendations.map(rec => `<li style="margin-bottom: 8px;">${escapeHtml(rec)}</li>`).join('')}
               </ul>
             </div>
           ` : ''}
 
           <!-- Footer -->
           <div class="footer">
-            <div>ImmuniTrack Kenya - Ministry of Health</div>
+            <div>Kinga Yetu - Ministry of Health</div>
             <div>Report generated on: ${new Date(data.generatedAt).toLocaleString('en-KE')}</div>
-            <div>This is an official report. For inquiries, contact: analytics@immunitrack.co.ke</div>
+            <div>This is an official report. For inquiries, contact: analytics@kingayetu.co.ke</div>
             <div class="no-print">
               <button onclick="window.print()" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px;">
                 Print Report

@@ -21,12 +21,25 @@ import { CreateReportDto, UpdateReportDto, ScheduleReportDto } from './dto/repor
 import { CoverageReportRequestDto } from './dto/coverage-report.dto';
 import { FacilityStatsRequestDto } from './dto/facility-stats.dto';
 import { MissedVaccinesRequestDto } from './dto/missed-vaccines.dto';
-import { ReportType } from '@prisma/client';
+import { ReportType, UserRole } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('reports')
+@ApiBearerAuth()
 @Controller('reports')
+@UseGuards(JwtAuthGuard, RolesGuard)
+// Previously this controller had NO auth guard at all — every endpoint
+// (generating/viewing/downloading county and facility performance
+// reports, which include operational health-system data, not just a
+// parent's own child's records) was reachable with no login whatsoever.
+// Reports aren't a parent-owned resource the way a child record is, so
+// the fix here is a role restriction rather than an ownership check:
+// only staff roles have any legitimate reason to generate or view them.
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.HEALTH_WORKER)
 @UsePipes(new ValidationPipe({ transform: true }))
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}

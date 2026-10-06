@@ -56,6 +56,7 @@ export class SchedulesController {
   }
 
   @Get()
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all schedules with pagination' })
   @ApiResponse({
     status: 200,
@@ -85,6 +86,7 @@ export class SchedulesController {
     @Query('endDate') endDate?: string,
     @Query('search') search?: string,
     @Query('facilityId') facilityId?: string,
+    @Request() req?: any,
   ): Promise<PaginatedSchedulesResponseDto> {
     return this.schedulesService.findAll(
       page,
@@ -98,6 +100,7 @@ export class SchedulesController {
       endDate,
       search,
       facilityId,
+      req?.user,
     );
   }
 
@@ -176,8 +179,8 @@ export class SchedulesController {
     type: [ScheduleResponseDto],
   })
   @ApiParam({ name: 'childId', description: 'Child ID' })
-  async findByChildId(@Param('childId') childId: string): Promise<ScheduleResponseDto[]> {
-    return this.schedulesService.findByChildId(childId);
+  async findByChildId(@Param('childId') childId: string, @Request() req: any): Promise<ScheduleResponseDto[]> {
+    return this.schedulesService.findByChildId(childId, req.user.id);
   }
 
   @Get('child/:childId/stats')
@@ -216,8 +219,8 @@ export class SchedulesController {
   })
   @ApiResponse({ status: 404, description: 'Schedule not found' })
   @ApiParam({ name: 'id', description: 'Schedule ID' })
-  async findOne(@Param('id') id: string): Promise<ScheduleResponseDto> {
-    return this.schedulesService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req: any): Promise<ScheduleResponseDto> {
+    return this.schedulesService.findOne(id, req.user.id);
   }
 
   @Patch(':id/reschedule')

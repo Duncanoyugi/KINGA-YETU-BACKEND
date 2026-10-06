@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReminderEngineService } from './reminder-engine.service';
 import {
@@ -145,7 +145,7 @@ export class RemindersService {
     };
   }
 
-  async findOne(id: string): Promise<ReminderResponseDto> {
+  async findOne(id: string, userId?: string): Promise<ReminderResponseDto> {
     const reminder = await this.prisma.reminder.findUnique({
       where: { id },
       include: {
@@ -166,6 +166,7 @@ export class RemindersService {
           include: {
             user: {
               select: {
+                id: true,
                 email: true,
                 phoneNumber: true,
                 fullName: true,
@@ -179,8 +180,28 @@ export class RemindersService {
     if (!reminder) {
       throw new NotFoundException(`Reminder with ID ${id} not found`);
     }
+
+    // Same IDOR pattern found and fixed across children/immunizations/
+    // schedules/parents earlier in this pass — flagged as a known
+    // residual gap at the time, closed now.
+    await this.assertCanAccessReminder(reminder, userId);
     
     return this.mapToResponseDto(reminder);
+  }
+
+  /** Mirrors ChildrenService.assertCanAccessChild and siblings. */
+  private async assertCanAccessReminder(
+    reminder: { parent?: { user?: { id: string } | null } | null },
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) return;
+    const ownerUserId = reminder.parent?.user?.id;
+    if (ownerUserId && ownerUserId !== userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'].includes(user.role)) {
+        throw new ForbiddenException('You are not authorized to view this reminder');
+      }
+    }
   }
 
   async update(id: string, updateReminderDto: UpdateReminderDto): Promise<ReminderResponseDto> {
@@ -326,17 +347,53 @@ export class RemindersService {
     return this.mapToResponseDto(updatedReminder);
   }
 
-  async getChildReminders(childId: string, includePast: boolean = false): Promise<ReminderResponseDto[]> {
+  async getChildReminders(childId: string, includePast: boolean = false, userId?: string): Promise<ReminderResponseDto[]> {
+    if (userId) {
+      const child = await this.prisma.child.findUnique({ where: { id: childId }, select: { parentId: true } });
+      if (!child) {
+        throw new NotFoundException(`Child with ID ${childId} not found`);
+      }
+      await this.assertCanAccessParentId(child.parentId, userId);
+    }
     const reminders = await this.reminderEngine.getChildReminders(childId, includePast);
     return reminders.map(reminder => this.mapToResponseDto(reminder));
   }
 
-  async getParentReminders(parentId: string): Promise<ReminderResponseDto[]> {
+  async getParentReminders(parentId: string, userId?: string): Promise<ReminderResponseDto[]> {
+    if (userId) {
+      await this.assertCanAccessParentId(parentId, userId);
+    }
     const reminders = await this.reminderEngine.getParentReminders(parentId);
     return reminders.map(reminder => this.mapToResponseDto(reminder));
   }
 
-  async acknowledgeReminder(id: string, responseNote?: string): Promise<ReminderResponseDto> {
+  /** Same access rule as assertCanAccessReminder, starting from a parentId directly. */
+  private async assertCanAccessParentId(parentId: string, userId: string): Promise<void> {
+    const parent = await this.prisma.parent.findUnique({ where: { id: parentId }, select: { userId: true } });
+    if (parent && parent.userId !== userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'].includes(user.role)) {
+        throw new ForbiddenException("You are not authorized to view this parent's reminders");
+      }
+    }
+  }
+
+  async acknowledgeReminder(id: string, responseNote?: string, userId?: string): Promise<ReminderResponseDto> {
+    if (userId) {
+      const existing = await this.prisma.reminder.findUnique({
+        where: { id },
+        include: { parent: { select: { userId: true } } },
+      });
+      if (!existing) {
+        throw new NotFoundException(`Reminder with ID ${id} not found`);
+      }
+      if (existing.parent?.userId !== userId) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user || !['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'].includes(user.role)) {
+          throw new ForbiddenException('You are not authorized to acknowledge this reminder');
+        }
+      }
+    }
     const reminder = await this.reminderEngine.acknowledgeReminder(id, responseNote);
     return this.mapToResponseDto(reminder);
   }

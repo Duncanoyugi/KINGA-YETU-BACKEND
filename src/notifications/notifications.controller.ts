@@ -46,10 +46,17 @@ export class NotificationsController {
   @ApiResponse({ status: 200, description: 'User notifications retrieved' })
   async getUserNotifications(
     @Param('userId') userId: string,
+    @Request() req: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('unreadOnly') unreadOnly?: boolean,
   ) {
+    // Previously nothing in this controller looked at req.user: the
+    // userId in the URL was trusted outright, so any logged-in account
+    // could read, clear or delete anyone's notifications and read or
+    // change anyone's notification preferences (e.g. switch off another
+    // parent's vaccine reminders).
+    this.notificationsService.assertOwnerOrAdmin(userId, req.user);
     return this.notificationsService.getUserNotifications(
       userId,
       page ? Number(page) : 1,
@@ -63,7 +70,8 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Get unread notification count' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'Unread count retrieved' })
-  async getUnreadCount(@Param('userId') userId: string) {
+  async getUnreadCount(@Param('userId') userId: string, @Request() req: any) {
+    this.notificationsService.assertOwnerOrAdmin(userId, req.user);
     const result = await this.notificationsService.getUserNotifications(userId, 1, 1, true);
     return result.unreadCount;
   }
@@ -73,7 +81,8 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Mark all notifications as read' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })
-  async markAllAsRead(@Param('userId') userId: string) {
+  async markAllAsRead(@Param('userId') userId: string, @Request() req: any) {
+    this.notificationsService.assertOwnerOrAdmin(userId, req.user);
     return this.notificationsService.markAllAsRead(userId);
   }
 
@@ -82,8 +91,8 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Mark notification as read' })
   @ApiParam({ name: 'notificationId', description: 'Notification ID' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
-  async markAsRead(@Param('notificationId') notificationId: string) {
-    return this.notificationsService.markAsRead(notificationId);
+  async markAsRead(@Param('notificationId') notificationId: string, @Request() req: any) {
+    return this.notificationsService.markAsRead(notificationId, req.user);
   }
 
   @Delete(':notificationId')
@@ -91,12 +100,8 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Delete notification' })
   @ApiParam({ name: 'notificationId', description: 'Notification ID' })
   @ApiResponse({ status: 200, description: 'Notification deleted' })
-  async deleteNotification(@Param('notificationId') notificationId: string) {
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
-    await prisma.notification.delete({ where: { id: notificationId } });
-    await prisma.$disconnect();
-    return { success: true };
+  async deleteNotification(@Param('notificationId') notificationId: string, @Request() req: any) {
+    return this.notificationsService.deleteNotification(notificationId, req.user);
   }
 
   @Get('preferences/:userId')
@@ -104,7 +109,8 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Get user notification preferences' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'User notification preferences retrieved' })
-  async getPreferences(@Param('userId') userId: string) {
+  async getPreferences(@Param('userId') userId: string, @Request() req: any) {
+    this.notificationsService.assertOwnerOrAdmin(userId, req.user);
     return this.notificationsService.getNotificationPreferences(userId);
   }
 
@@ -115,6 +121,7 @@ export class NotificationsController {
   @ApiResponse({ status: 200, description: 'User notification preferences updated' })
   async updatePreferences(
     @Param('userId') userId: string,
+    @Request() req: any,
     @Body() updateData: {
       emailNotifications?: boolean;
       smsNotifications?: boolean;
@@ -124,6 +131,7 @@ export class NotificationsController {
       reminderDays?: number[];
     },
   ) {
+    this.notificationsService.assertOwnerOrAdmin(userId, req.user);
     return this.notificationsService.updateNotificationPreferences(userId, updateData);
   }
 }

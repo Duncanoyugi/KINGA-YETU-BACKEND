@@ -10,9 +10,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const pool = new Pool({ connectionString });
     const adapter = new PrismaPg(pool);
 
+    const isProduction = process.env.NODE_ENV === 'production';
+
     super({
       adapter,
-      log: ['query', 'info', 'warn', 'error'],
+      // `query` logging prints every statement. It is invaluable while
+      // debugging locally but floods a Render instance's log stream and slows
+      // throughput in production, so restrict it to errors/warnings there.
+      log: isProduction ? ['warn', 'error'] : ['query', 'info', 'warn', 'error'],
       errorFormat: 'pretty',
     });
   }

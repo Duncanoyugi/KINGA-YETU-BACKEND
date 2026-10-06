@@ -465,6 +465,7 @@ export class ImmunizationsService {
     endDate?: string,
     status?: ImmunizationStatus,
     search?: string,
+    requester?: { id: string; role: string },
   ): Promise<PaginatedImmunizationsResponseDto> {
     const skip = (page - 1) * limit;
 
@@ -475,6 +476,33 @@ export class ImmunizationsService {
     if (facilityId) where.facilityId = facilityId;
     if (healthWorkerId) where.healthWorkerId = healthWorkerId;
     if (status) where.status = status;
+
+    // Previously `where` started (and, with no filters supplied, stayed)
+    // completely empty — meaning ANY authenticated user, including a
+    // plain PARENT account, could call this with no parameters at all
+    // and page through every child's immunization record in the entire
+    // system. The controller now restricts this route to
+    // HEALTH_WORKER/ADMIN/SUPER_ADMIN, and a health worker is further
+    // confined here to their own facility's records — they have no
+    // legitimate reason to browse another facility's patient data, and
+    // a client-supplied `facilityId` was previously trusted outright
+    // with no check that it was actually theirs.
+    if (requester?.role === 'HEALTH_WORKER') {
+      const healthWorker = await this.prisma.healthWorker.findUnique({
+        where: { userId: requester.id },
+        select: { facilityId: true },
+      });
+      if (!healthWorker?.facilityId) {
+        // Not assigned to a facility yet — nothing to scope to, so
+        // return no results rather than silently falling through to an
+        // unfiltered (system-wide) query.
+        return { data: [], total: 0, page, limit, totalPages: 0 };
+      }
+      if (facilityId && facilityId !== healthWorker.facilityId) {
+        throw new ForbiddenException("You can only view your own facility's immunization records");
+      }
+      where.facilityId = healthWorker.facilityId;
+    }
 
     // Date range filter
     if (startDate || endDate) {
@@ -571,7 +599,7 @@ export class ImmunizationsService {
     };
   }
 
-  async findOne(id: string): Promise<ImmunizationResponseDto> {
+  async findOne(id: string, userId?: string): Promise<ImmunizationResponseDto> {
     const immunization = await this.prisma.immunization.findUnique({
       where: { id },
       include: {
@@ -648,11 +676,52 @@ export class ImmunizationsService {
       throw new NotFoundException(`Immunization with ID ${id} not found`);
     }
 
+    // Same IDOR gap as ChildrenService.findOne — this returned any
+    // child's vaccination record (dates, vaccine given, administering
+    // health worker) to any authenticated user regardless of role or
+    // relationship to the child. The query above already includes the
+    // owning parent's userId, so this is a free check (no extra query).
+    await this.assertCanAccessImmunization(immunization, userId);
+
     return this.mapToImmunizationResponseDto(immunization);
   }
 
-  async findByChildId(childId: string): Promise<ImmunizationResponseDto[]> {
+  /**
+   * Shared ownership check, mirroring ChildrenService.assertCanAccessChild:
+   * the child's own parent always has access; ADMIN/SUPER_ADMIN/
+   * HEALTH_WORKER may view any record. `userId` omitted (e.g. internal
+   * calls) skips the check, matching the pre-existing behaviour of the
+   * rest of this service's write paths.
+   */
+  private async assertCanAccessImmunization(
+    immunization: { child?: { parent?: { user?: { id: string } | null } | null } | null },
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) return;
+
+    const ownerUserId = immunization.child?.parent?.user?.id;
+    if (ownerUserId && ownerUserId !== userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'].includes(user.role)) {
+        throw new ForbiddenException('You are not authorized to view this immunization record');
+      }
+    }
+  }
+
+  async findByChildId(childId: string, userId?: string): Promise<ImmunizationResponseDto[]> {
     try {
+      // Same IDOR gap as findOne() above, for the "all immunizations for
+      // this child" list view. childrenService is already injected here,
+      // so this reuses the exact same access policy as ChildrenService
+      // rather than duplicating it.
+      if (userId) {
+        const child = await this.prisma.child.findUnique({ where: { id: childId }, select: { parentId: true } });
+        if (!child) {
+          throw new NotFoundException(`Child with ID ${childId} not found`);
+        }
+        await this.childrenService.assertCanAccessChild(child, userId, 'view');
+      }
+
       const immunizations = await this.prisma.immunization.findMany({
         where: { childId },
         include: {
@@ -907,14 +976,14 @@ export class ImmunizationsService {
     };
   }
 
-  async getChildImmunizationHistory(childId: string): Promise<{
+  async getChildImmunizationHistory(childId: string, userId?: string): Promise<{
     immunizations: ImmunizationResponseDto[];
     upcomingVaccines: any[];
     missedVaccines: any[];
     coverage: number;
   }> {
     const [immunizations, schedules] = await Promise.all([
-      this.findByChildId(childId),
+      this.findByChildId(childId, userId),
       this.prisma.vaccinationSchedule.findMany({
         where: { childId },
         include: {

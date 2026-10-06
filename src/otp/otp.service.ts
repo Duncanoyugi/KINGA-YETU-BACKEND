@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOtpDto } from './dto/create-otp.dto';
 import { UpdateOtpDto } from './dto/update-otp.dto';
@@ -11,8 +11,16 @@ export interface OtpWithCode extends OtpResponseDto {
   code: string;
 }
 
+// Maximum number of incorrect guesses allowed against a single OTP
+// before it is invalidated, regardless of expiry. Combined with the
+// request-rate throttling on the OTP endpoints (see main.ts /
+// otp.controller.ts), this stops a 6-digit code from being brute-forced.
+const MAX_OTP_ATTEMPTS = 5;
+
 @Injectable()
 export class OtpService {
+  private readonly logger = new Logger(OtpService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async generateOtp(data: CreateOtpDto): Promise<OtpWithCode> {
@@ -24,7 +32,10 @@ export class OtpService {
       specialChars: false,
     });
 
-    console.log(`🔑 [OtpService] Generated OTP code for ${data.email}: ${otpCode}`);
+    // NOTE: never log the OTP code itself (email/SMS providers already
+    // receive it) — it is sensitive, single-use credential material and
+    // must not end up in application logs or log aggregators.
+    this.logger.log(`Generating OTP for ${this.maskContact(data.email || data.phone)}`);
 
     // Set expiration to 10 minutes from now
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -44,7 +55,6 @@ export class OtpService {
     });
 
     if (existingOtp) {
-      console.log(`📋 [OtpService] Found existing OTP for ${data.email}: ${existingOtp.code}`);
       // Return existing OTP with code for email sending
       return {
         ...this.mapToOtpResponseDto(existingOtp),
@@ -64,8 +74,6 @@ export class OtpService {
       },
     });
 
-    console.log(`✅ [OtpService] Created new OTP for ${data.email}: ${otp.code}`);
-
     // Return with code for email sending
     return {
       ...this.mapToOtpResponseDto(otp),
@@ -77,39 +85,54 @@ export class OtpService {
     const otp = await this.prisma.otp.findFirst({
       where: {
         email,
-        code,
         type,
         isUsed: false,
         expiresAt: { gt: new Date() },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (!otp) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
-
-    // Mark OTP as used
-    await this.prisma.otp.update({
-      where: { id: otp.id },
-      data: { isUsed: true },
-    });
-
-    console.log(`✅ [OtpService] OTP verified for ${email}`);
-    return true;
+    return this.checkAndConsume(otp, code);
   }
 
   async verifyPhoneOtp(phone: string, code: string, type: OtpType): Promise<boolean> {
     const otp = await this.prisma.otp.findFirst({
       where: {
         phone,
-        code,
         type,
         isUsed: false,
         expiresAt: { gt: new Date() },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
+    return this.checkAndConsume(otp, code);
+  }
+
+  /**
+   * Shared verification logic: rejects once MAX_OTP_ATTEMPTS wrong
+   * guesses have been made against a given OTP row (even if it has not
+   * expired), so a 6-digit code cannot be brute-forced by attackers who
+   * get past the per-IP rate limit (e.g. via a botnet).
+   */
+  private async checkAndConsume(
+    otp: { id: string; code: string; attempts: number } | null,
+    code: string,
+  ): Promise<boolean> {
     if (!otp) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    if (otp.attempts >= MAX_OTP_ATTEMPTS) {
+      await this.prisma.otp.update({ where: { id: otp.id }, data: { isUsed: true } });
+      throw new BadRequestException('Too many incorrect attempts. Please request a new code.');
+    }
+
+    if (otp.code !== code) {
+      await this.prisma.otp.update({
+        where: { id: otp.id },
+        data: { attempts: { increment: 1 } },
+      });
       throw new BadRequestException('Invalid or expired OTP');
     }
 
@@ -123,8 +146,6 @@ export class OtpService {
   }
 
   async resendOtp(email: string, type: OtpType): Promise<OtpWithCode> {
-    console.log(`🔄 [OtpService] Resending OTP for ${email}`);
-
     // Delete existing unused OTPs
     await this.prisma.otp.deleteMany({
       where: {
@@ -143,7 +164,7 @@ export class OtpService {
       where: { id },
       data: updateOtpDto,
     });
-    
+
     return this.mapToOtpResponseDto(otp);
   }
 
@@ -151,7 +172,7 @@ export class OtpService {
     const otp = await this.prisma.otp.delete({
       where: { id },
     });
-    
+
     return this.mapToOtpResponseDto(otp);
   }
 
@@ -198,5 +219,15 @@ export class OtpService {
     }
 
     return otp.code;
+  }
+
+  /** Masks an email/phone for safe logging, e.g. "jo***@example.com" */
+  private maskContact(contact?: string | null): string {
+    if (!contact) return 'unknown';
+    if (contact.includes('@')) {
+      const [user, domain] = contact.split('@');
+      return `${user.slice(0, 2)}***@${domain}`;
+    }
+    return `${contact.slice(0, 4)}***${contact.slice(-2)}`;
   }
 }

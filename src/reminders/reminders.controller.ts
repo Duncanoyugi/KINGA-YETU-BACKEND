@@ -12,9 +12,15 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-  ParseBoolPipe 
+  ParseBoolPipe,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { RemindersService } from './reminders.service';
 import { 
   CreateReminderDto, 
@@ -31,7 +37,16 @@ import {
 } from './dto/reminder-response.dto';
 
 @ApiTags('reminders')
+@ApiBearerAuth()
 @Controller('reminders')
+@UseGuards(JwtAuthGuard, RolesGuard)
+// Previously no auth guard at all: creating/deleting/bulk-sending
+// reminders (a real SMS/email cost and abuse vector) and viewing any
+// parent's or child's full reminder list were all reachable with no
+// login. Most of this controller is a staff/system operation, so that's
+// the default; the handful of genuinely parent-facing read/acknowledge
+// routes below override it with their own @Roles().
+@Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 @UsePipes(new ValidationPipe({ transform: true }))
 export class RemindersController {
   constructor(private readonly remindersService: RemindersService) {}
@@ -74,12 +89,13 @@ export class RemindersController {
   }
 
   @Get(':id')
+  @Roles(UserRole.PARENT, UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get a specific reminder by ID' })
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, type: ReminderResponseDto })
   @ApiResponse({ status: 404, description: 'Reminder not found' })
-  findOne(@Param('id') id: string) {
-    return this.remindersService.findOne(id);
+  findOne(@Param('id') id: string, @Request() req: any) {
+    return this.remindersService.findOne(id, req.user.id);
   }
 
   @Patch(':id')
@@ -123,35 +139,40 @@ export class RemindersController {
   }
 
   @Get('child/:childId')
+  @Roles(UserRole.PARENT, UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all reminders for a specific child' })
   @ApiParam({ name: 'childId', type: String })
   @ApiQuery({ name: 'includePast', required: false, type: Boolean })
   @ApiResponse({ status: 200, type: [ReminderResponseDto] })
   getChildReminders(
     @Param('childId') childId: string,
+    @Request() req: any,
     @Query('includePast', new ParseBoolPipe({ optional: true })) includePast?: boolean,
   ) {
-    return this.remindersService.getChildReminders(childId, includePast);
+    return this.remindersService.getChildReminders(childId, includePast, req.user.id);
   }
 
   @Get('parent/:parentId')
+  @Roles(UserRole.PARENT, UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all reminders for a specific parent' })
   @ApiParam({ name: 'parentId', type: String })
   @ApiResponse({ status: 200, type: [ReminderResponseDto] })
-  getParentReminders(@Param('parentId') parentId: string) {
-    return this.remindersService.getParentReminders(parentId);
+  getParentReminders(@Param('parentId') parentId: string, @Request() req: any) {
+    return this.remindersService.getParentReminders(parentId, req.user.id);
   }
 
   @Post(':id/acknowledge')
+  @Roles(UserRole.PARENT, UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Acknowledge a reminder (parent response)' })
   @ApiParam({ name: 'id', type: String })
   @ApiQuery({ name: 'responseNote', required: false, type: String })
   @ApiResponse({ status: 200, type: ReminderResponseDto })
   acknowledgeReminder(
     @Param('id') id: string,
+    @Request() req: any,
     @Query('responseNote') responseNote?: string,
   ) {
-    return this.remindersService.acknowledgeReminder(id, responseNote);
+    return this.remindersService.acknowledgeReminder(id, responseNote, req.user.id);
   }
 
   @Get('stats/summary')

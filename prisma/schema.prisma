@@ -169,6 +169,7 @@ model Otp {
   type      OtpType
   expiresAt DateTime
   isUsed    Boolean  @default(false)
+  attempts  Int      @default(0)
   metadata  String?  @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -67,6 +67,7 @@ export class ImmunizationsController {
   }
 
   @Get()
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all immunizations with pagination' })
   @ApiResponse({
     status: 200,
@@ -94,6 +95,7 @@ export class ImmunizationsController {
     @Query('endDate') endDate?: string,
     @Query('status') status?: ImmunizationStatus,
     @Query('search') search?: string,
+    @Request() req?: any,
   ): Promise<PaginatedImmunizationsResponseDto> {
     return this.immunizationsService.findAll(
       page,
@@ -106,6 +108,7 @@ export class ImmunizationsController {
       endDate,
       status,
       search,
+      req?.user,
     );
   }
 
@@ -129,8 +132,8 @@ export class ImmunizationsController {
   @ApiOperation({ summary: 'Get child immunization history' })
   @ApiResponse({ status: 200, description: 'Child immunization history' })
   @ApiParam({ name: 'childId', description: 'Child ID' })
-  async getChildHistory(@Param('childId') childId: string) {
-    return this.immunizationsService.getChildImmunizationHistory(childId);
+  async getChildHistory(@Param('childId') childId: string, @Request() req: any) {
+    return this.immunizationsService.getChildImmunizationHistory(childId, req.user.id);
   }
 
   @Get('child/:childId')
@@ -142,8 +145,8 @@ export class ImmunizationsController {
     type: [ImmunizationResponseDto],
   })
   @ApiParam({ name: 'childId', description: 'Child ID' })
-  async findByChildId(@Param('childId') childId: string): Promise<ImmunizationResponseDto[]> {
-    return this.immunizationsService.findByChildId(childId);
+  async findByChildId(@Param('childId') childId: string, @Request() req: any): Promise<ImmunizationResponseDto[]> {
+    return this.immunizationsService.findByChildId(childId, req.user.id);
   }
 
   @Get('search/:term')
@@ -164,8 +167,8 @@ export class ImmunizationsController {
   })
   @ApiResponse({ status: 404, description: 'Immunization not found' })
   @ApiParam({ name: 'id', description: 'Immunization ID' })
-  async findOne(@Param('id') id: string): Promise<ImmunizationResponseDto> {
-    return this.immunizationsService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req: any): Promise<ImmunizationResponseDto> {
+    return this.immunizationsService.findOne(id, req.user.id);
   }
 
   @Patch(':id')

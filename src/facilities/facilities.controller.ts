@@ -120,6 +120,8 @@ export class FacilitiesController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HEALTH_WORKER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update a facility' })
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200 })
@@ -132,7 +134,16 @@ export class FacilitiesController {
     return this.facilitiesService.update(id, updateFacilityDto);
   }
 
+  // Previously deleteFacility/activateFacility/deactivateFacility had NO
+  // auth guard at all — anyone with no login could delete a health
+  // facility record outright, or deactivate every facility in the
+  // system, a severe data-integrity/availability risk. Deletion is
+  // restricted to admins only (narrower than update), matching the
+  // ADMIN/SUPER_ADMIN-only pattern used for destructive operations
+  // elsewhere in this codebase (see ChildrenService.remove).
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a facility' })
   @ApiParam({ name: 'id', type: String })
@@ -143,6 +154,8 @@ export class FacilitiesController {
   }
 
   @Post(':id/activate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Activate a facility' })
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200 })
@@ -152,6 +165,8 @@ export class FacilitiesController {
   }
 
   @Post(':id/deactivate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Deactivate a facility' })
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200 })

@@ -9,8 +9,13 @@ import {
   UsePipes,
   ValidationPipe,
   Param,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { AnalyticsService } from './analytics.service';
 import {
   AnalyticsQueryDto,
@@ -31,7 +36,15 @@ import {
 } from './dto/analytics-response.dto';
 
 @ApiTags('analytics')
+@ApiBearerAuth()
 @Controller('analytics')
+@UseGuards(JwtAuthGuard, RolesGuard)
+// Previously no auth guard at all: system/county/facility-level analytics
+// (outbreak risk, dashboards, performance benchmarks) were readable by
+// anyone with no login. None of these are scoped to an individual
+// parent's own child, so — like reports.controller.ts — this is a role
+// restriction rather than an ownership check.
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.HEALTH_WORKER)
 @UsePipes(new ValidationPipe({ transform: true }))
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}

@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { OtpService } from './otp.service';
 import { CreateOtpDto } from './dto/create-otp.dto';
 import { UpdateOtpDto } from './dto/update-otp.dto';
@@ -15,6 +16,7 @@ export class OtpController {
   constructor(private readonly otpService: OtpService) {}
 
   @Post('generate')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: 'Generate OTP' })
   @ApiResponse({
     status: 201,
@@ -25,7 +27,13 @@ export class OtpController {
     return this.otpService.generateOtp(createOtpDto);
   }
 
+  // Deliberately tightly throttled: this is the endpoint that checks a
+  // 6-digit code, so it's the main brute-force target in the whole API.
+  // A per-code attempt cap (see OtpService.MAX_OTP_ATTEMPTS) backstops
+  // this in case a single attacker source manages to get more requests
+  // through (e.g. a botnet spreading guesses across many IPs).
   @Post('verify')
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @ApiOperation({ summary: 'Verify OTP' })
   @ApiResponse({ status: 200, description: 'OTP verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
@@ -41,6 +49,7 @@ export class OtpController {
   }
 
   @Post('resend')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: 'Resend OTP' })
   @ApiResponse({
     status: 200,

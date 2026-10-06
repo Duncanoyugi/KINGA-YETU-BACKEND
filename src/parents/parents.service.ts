@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ParentProfileDto } from './dto/parent-profile.dto';
@@ -175,7 +176,7 @@ export class ParentsService {
     };
   }
 
-  async findOne(id: string): Promise<ParentResponseDto> {
+  async findOne(id: string, userId?: string): Promise<ParentResponseDto> {
     const parent = await this.prisma.parent.findUnique({
       where: { id },
       include: {
@@ -225,6 +226,17 @@ export class ParentsService {
 
     if (!parent) {
       throw new NotFoundException(`Parent with ID ${id} not found`);
+    }
+
+    // Same IDOR pattern found across children/immunizations/schedules —
+    // this returns the parent's full profile AND every one of their
+    // children (with recent immunization/schedule data), with no
+    // ownership check at all.
+    if (userId && parent.user?.id !== userId) {
+      const requestingUser = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!requestingUser || !['ADMIN', 'SUPER_ADMIN', 'HEALTH_WORKER'].includes(requestingUser.role)) {
+        throw new ForbiddenException('You are not authorized to view this parent profile');
+      }
     }
 
     return this.mapToParentResponseDto(parent);

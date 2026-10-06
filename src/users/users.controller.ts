@@ -11,7 +11,10 @@ import {
   HttpCode,
   HttpStatus,
   Put,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -123,6 +126,7 @@ export class UsersController {
   }
 
   @Put(':id/password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Change user password' })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid password or confirmation' })
@@ -130,7 +134,21 @@ export class UsersController {
   async changePassword(
     @Param('id') id: string,
     @Body() changePasswordDto: ChangePasswordDto,
+    @Request() req: any,
   ): Promise<void> {
+    // Previously this had no @Roles() and no check against req.user at
+    // all — the route requires the *target* user's current password
+    // (see UsersService.changePassword), but never confirmed the caller
+    // actually IS that user. That meant anyone logged in as any account
+    // could reset a *different* user's password just by supplying that
+    // other account's current password — e.g. one obtained from an
+    // unrelated data breach — without ever needing to log into the
+    // target account itself, bypassing whatever protections exist on the
+    // real login flow. Also had no rate limit on top, for a
+    // credential-related endpoint.
+    if (req.user.id !== id && req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('You can only change your own password');
+    }
     return this.usersService.changePassword(id, changePasswordDto);
   }
 

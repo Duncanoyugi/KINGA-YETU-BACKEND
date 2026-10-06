@@ -170,8 +170,8 @@ export class ParentsController {
   })
   @ApiResponse({ status: 404, description: 'Parent not found' })
   @ApiParam({ name: 'id', description: 'Parent ID' })
-  async findOne(@Param('id') id: string): Promise<ParentResponseDto> {
-    return this.parentsService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req: any): Promise<ParentResponseDto> {
+    return this.parentsService.findOne(id, req.user.id);
   }
 
   @Patch('profile')

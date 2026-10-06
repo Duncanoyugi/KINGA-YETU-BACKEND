@@ -4,10 +4,12 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { MailerService } from '../mailer/mailer.service';
@@ -32,6 +34,8 @@ export interface AuthResponse {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private usersService: UsersService,
@@ -101,10 +105,10 @@ export class AuthService {
           userId: user.id,
         },
       });
-      console.log(`✅ [AuthService] Parent profile created for user: ${user.email}`);
+      this.logger.log(`Parent profile created for new user ${user.id}`);
     }
 
-    console.log(`✅ [AuthService] User created: ${user.email}`);
+    this.logger.log(`User registered: ${user.id} (role=${user.role})`);
 
     // Generate and send OTP
     try {
@@ -114,18 +118,14 @@ export class AuthService {
         type: OtpType.EMAIL_VERIFICATION,
         metadata: JSON.stringify({ userId: user.id }),
       });
-      
-      // Access the code directly from the result
+
+      // Access the code directly from the result — never logged, only
+      // ever transmitted to the user via their own verified email.
       const otpCode = otpResult.code;
-      
-      console.log(`📧 [AuthService] Sending OTP email to ${user.email} with code: ${otpCode}`);
-      
-      // Send OTP email with the actual code
+
       await this.mailerService.sendOtpEmail(user.email, otpCode, user.fullName);
-      
-      console.log(`✅ [AuthService] OTP email sent successfully to ${user.email}`);
-    } catch (error) {
-      console.error(`❌ [AuthService] Failed to send OTP email to ${user.email}:`, error.message);
+    } catch (error: any) {
+      this.logger.error(`Failed to send verification email to user ${user.id}: ${error.message}`);
     }
 
     // Log audit
@@ -217,11 +217,6 @@ export class AuthService {
       role: user.role,
     };
 
-    // Debug: Log JWT configuration
-    const jwtSecret = this.configService.get('JWT_ACCESS_SECRET');
-    console.log('[AuthService] JWT_ACCESS_SECRET for signing:', jwtSecret ? '✓ (secret present)' : '✗ (secret MISSING)');
-    console.log('[AuthService] Signing token with payload:', payload);
-
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
       expiresIn: '7d',
@@ -311,14 +306,13 @@ export class AuthService {
       data: { isEmailVerified: true },
     });
 
-    console.log(`✅ [AuthService] Email verified for ${email}`);
+    this.logger.log(`Email verified for user ${user.id}`);
 
     // Send welcome email AFTER successful verification
     try {
       await this.mailerService.sendWelcomeEmail(user.email, user.fullName);
-      console.log(`📧 [AuthService] Welcome email sent to ${user.email}`);
-    } catch (error) {
-      console.warn(`[AuthService] Failed to send welcome email to ${user.email}: ${error.message}`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to send welcome email to user ${user.id}: ${error.message}`);
     }
 
     // Log audit
@@ -353,12 +347,10 @@ export class AuthService {
       });
 
       const otpCode = otpResult.code;
-      
-      console.log(`📧 [AuthService] Sending password reset OTP to ${email} with code: ${otpCode}`);
-      
+
       await this.mailerService.sendOtpEmail(email, otpCode, user.fullName);
-    } catch (error) {
-      console.warn(`[AuthService] Failed to send password reset email to ${email}: ${error.message}`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to send password reset email to user ${user.id}: ${error.message}`);
     }
 
     return { message: 'If an account exists with this email, you will receive reset instructions.' };
@@ -459,22 +451,20 @@ export class AuthService {
     // Resend OTP
     const otpResult = await this.otpService.resendOtp(email, OtpType.EMAIL_VERIFICATION);
     const otpCode = otpResult.code;
-    
-    console.log(`📧 [AuthService] Resending verification OTP to ${email} with code: ${otpCode}`);
-    
+
     // Send OTP email
     await this.mailerService.sendOtpEmail(email, otpCode, user.fullName);
 
     return { message: 'Verification email resent' };
   }
 
-  private generateRandomToken(length: number = 64): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
-    for (let i = 0; i < length; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
+  /**
+   * Generates a cryptographically secure random session token.
+   * (Previously used Math.random(), which is not a CSPRNG and produces
+   * predictable output — unsafe for anything used as a credential.)
+   */
+  private generateRandomToken(bytes: number = 48): string {
+    return randomBytes(bytes).toString('base64url');
   }
 
   private async createAuditLog(

@@ -1,10 +1,16 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { NotificationQueueService, NotificationOptions } from './notification-queue.service';
 import { SmsProvider, SmsOptions } from './providers/sms.provider';
 import { EmailProvider, EmailOptions } from './providers/email.provider';
 import { PushProvider, PushNotificationOptions } from './providers/push.provider';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+/** The authenticated user, as populated on `req.user` by JwtStrategy. */
+export interface Requester {
+  id: string;
+  role: string;
+}
 
 @Injectable()
 export class NotificationsService {
@@ -174,8 +180,46 @@ export class NotificationsService {
   /**
    * Mark notification as read
    */
-  async markAsRead(notificationId: string) {
+  async markAsRead(notificationId: string, requester?: Requester) {
+    if (requester) {
+      await this.assertCanAccessNotification(notificationId, requester);
+    }
     return this.notificationQueue.markAsRead(notificationId);
+  }
+
+  /**
+   * Delete a notification. Previously the controller did this itself with
+   * `new PrismaClient()` on every request — with no ownership check, and
+   * (under this project's Prisma 7 driver-adapter setup) a bare
+   * PrismaClient can't even be constructed, so the route always failed.
+   */
+  async deleteNotification(notificationId: string, requester: Requester): Promise<{ success: true }> {
+    await this.assertCanAccessNotification(notificationId, requester);
+    await this.prisma.notification.delete({ where: { id: notificationId } });
+    return { success: true };
+  }
+
+  /**
+   * Notifications and notification preferences are personal: a user may
+   * only touch their own, or an ADMIN/SUPER_ADMIN acting on someone's
+   * behalf. (Health workers get no special access — nothing about their
+   * job requires reading another user's notification inbox.)
+   */
+  assertOwnerOrAdmin(ownerUserId: string, requester: Requester): void {
+    if (ownerUserId === requester.id) return;
+    if (requester.role === 'ADMIN' || requester.role === 'SUPER_ADMIN') return;
+    throw new ForbiddenException('You are not authorized to access these notifications');
+  }
+
+  private async assertCanAccessNotification(notificationId: string, requester: Requester): Promise<void> {
+    const notification = await this.prisma.notification.findUnique({
+      where: { id: notificationId },
+      select: { userId: true },
+    });
+    if (!notification) {
+      throw new NotFoundException(`Notification with ID ${notificationId} not found`);
+    }
+    this.assertOwnerOrAdmin(notification.userId, requester);
   }
 
   /**
